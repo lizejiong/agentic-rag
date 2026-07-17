@@ -373,10 +373,12 @@ Agent 约束：
 - Deep Agents 只暴露混合检索、图谱查询、证据读取和只读记忆工具；不暴露文件写入、Shell、代码执行、任意 MCP、外部网络或业务写操作。
 - 主 Agent 与所有子 Agent 使用同一个不可扩大的 ACL 快照；子 Agent 不能自行选择新知识空间或改变数据出网策略。
 - 允许验证任务规划和最多 2 个只读子 Agent；总步骤、总超时、Token、模型成本和取消信号由外层 LangGraph/NestJS 统一限制。
+- 实验使用独立资源池，最多并发 5 路，不能挤占默认问答容量。
 - 子 Agent 的中间结论不能直接进入答案，必须经过统一证据去重、Reranker、证据充分性和引用校验。
 - Deep Agents 运行与默认 LangGraph 运行使用相同问题、知识范围和模型进行 A/B 评测，并在 Langfuse 中使用独立策略版本。
 - 正式引入门槛：复杂问题正确率相对默认方案提升至少 5 个百分点、引用准确率不低于 0.95、ACL 越权为零、研究模式完成延迟 P95 不超过 30 秒、平均模型用量不超过默认方案 3 倍、取消与 Trace 完整率为 100%。
-- 任一门槛未通过时保留实验代码和报告，但不向普通用户开放，也不进入默认发布路径。
+- 上述指标是“是否采用 Deep Agents”的实验门槛，不是产品发布 SLO 或首期完成门槛。
+- 任一门槛未通过时保留实验代码和报告，但功能开关保持关闭，不向普通用户开放，不进入默认发布路径，也不加入生产 Docker Compose 运行依赖；这不阻塞其他阶段验收或产品上线。
 
 ### 9.7 回答与引用
 
@@ -666,6 +668,7 @@ Agent 约束：
 - `/conversations`、`/messages`：会话历史。
 - `POST /chat/stream`：兼容 AI SDK UI Message Stream 的 SSE 文本问答。
 - `POST /chat/:requestId/cancel`：幂等取消 Agent、模型流和待生成 TTS。
+- `GET /citations/:citationId/resolve`：按当前用户、当前 ACL 和当前文档状态重新鉴权后返回引用详情与不透明预览会话。
 - `/voice`：WebSocket ASR/TTS 会话。
 - `/graph`：实体、关系、路径和治理。
 - `/memories`：个人记忆与组织记忆。
@@ -676,8 +679,12 @@ Agent 约束：
 文本聊天协议：
 
 - 外部协议采用 AI SDK UI Message Stream；React `useChat` 通过自定义 `ChatTransport` 调用 NestJS，不直接访问 Python 服务。
-- 标准文本使用 AI SDK 文本 message parts；通用来源优先使用 source parts，企业文档页码、坐标、工作表和 ACL 快照使用类型化 `data-citation`。
+- 标准文本使用 AI SDK 文本 message parts；通用来源优先使用 source parts，企业文档页码、坐标和工作表使用类型化 `data-citation`。
 - 应用自定义 data parts 至少包含 `data-request-metadata`、`data-agent-status`、`data-retrieval-summary`、`data-citation` 和 `data-error-detail`。
+- 浏览器端 `data-citation` 仅包含不透明 `citation_id` 和展示所需的文档标题、位置、片段摘要；不得包含用户、部门、用户组、权限规则、内部 ACL 快照、MinIO 对象键或可长期使用的下载地址。
+- 打开引用时前端只提交 `citation_id`。NestJS 必须根据当前登录用户、最新 ACL、文档可用状态和版本重新鉴权；生成答案时的 ACL 快照和客户端字段都不能作为当前授权依据。
+- 引用预览内容经 NestJS 鉴权代理读取；不透明预览会话最长 5 秒且每次页面读取重新校验，不向浏览器暴露可绕过撤权的 MinIO 直链。
+- 引用生成后发生撤权、停用、软删除或版本失效时，解析接口返回无权访问或已失效，不得继续展示缓存正文。
 - `data-request-metadata` 包含 request ID、trace ID、策略版本和递增 sequence，不包含模型思维链。
 - NestJS 内部仍使用 `message.started`、`agent.status`、`retrieval.completed`、`content.delta`、`citation`、`message.completed`、`message.cancelled` 和 `error` 事件，但这些不是浏览器直接依赖的传输格式。
 - 服务端设置明确的聊天协议版本；前端发送支持版本，版本不兼容时在开始生成前失败。
@@ -779,7 +786,6 @@ Langfuse 记录：
 - 活跃文档不超过 10 万份。
 - 注册用户不超过 1,000。
 - 峰值同时进行的问答请求为 50。
-- Deep Agents 研究模式使用独立资源池，实验期最多并发 5 路，不能挤占默认问答的 50 路容量。
 - 导入任务与在线问答使用独立并发和资源配额，批量导入不得拖垮在线问答。
 
 ### 17.2 性能
@@ -788,7 +794,6 @@ Langfuse 记录：
 
 - 混合检索 P95 不超过 1.5 秒，不含最终 LLM 生成。
 - 文本问答端到端首字 P95 不超过 6 秒。
-- Deep Agents 研究模式按完成结果验收，完成延迟 P95 不超过 30 秒，不适用默认问答首字指标。
 - SSE 心跳间隔不超过 15 秒。
 - ASR 中间结果 P95 不超过 1 秒。
 - 第一完整句形成后，TTS 首音频 P95 不超过 2.5 秒。
@@ -1035,5 +1040,5 @@ Langfuse 记录：
 6. 用户私有记忆可控，组织记忆经管理员审核。
 7. 半双工语音链路可流式识别、生成、合成、播放和取消。
 8. 管理员能够追踪任务、AI Trace、反馈、评测、审计和数据出网。
-9. 质量、性能、安全和恢复指标达到本文门槛。
+9. 所有已启用的生产功能达到本文质量、性能、安全和恢复门槛；保持关闭的 Deep Agents 实验不属于产品发布门槛。
 10. Docker Compose 部署、备份、恢复和运维文档完整。
