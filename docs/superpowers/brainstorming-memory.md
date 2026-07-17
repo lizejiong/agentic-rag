@@ -20,11 +20,14 @@
 ## 架构约束
 
 - React 前端，NestJS 主后端，Python AI 服务。
+- React 聊天层使用 Vercel AI SDK UI；NestJS 输出兼容 UI Message Stream，语音继续使用独立 WebSocket。
+- 云模型始终由 Python AI 服务的统一适配层调用，Vercel AI SDK 不直接调用模型。
 - NestJS 与 Python 的长任务使用 PostgreSQL Outbox + Redis Streams，不使用仅适合 Node 的任务协议作为跨语言总线。
 - PostgreSQL/pgvector + Elasticsearch 提供混合检索，RRF 融合后由 Reranker 精排。
 - Neo4j 图谱自动抽取、人工治理，所有关系必须回到文档证据。
 - Redis 保存滑动窗口和会话摘要；Mem0 保存用户私有长期记忆和经审核的组织记忆。
 - 开发使用 LangGraph Studio，生产使用内网自托管 Langfuse；LangSmith 仅为可选适配。
+- 自定义 LangGraph 是生产核心；Deep Agents 只在第二阶段作为复杂跨文档研究模式实验，未通过质量、ACL、延迟和成本门槛时保持关闭且不进入生产依赖。
 - 首期只交付 Docker Compose，不承诺节点级高可用。
 
 ## 交付与质量
@@ -33,4 +36,3 @@
 - 上线前建立不少于 200 个真实问题的评测集。
 - 质量基线包括 Recall@10、nDCG@10、引用准确率、答案忠实度和不可回答处理正确率。
 - 设计文档在进入实施计划前需要独立审查通过。
-
