@@ -1,0 +1,6 @@
+{"requestId":"00000000-0000-4000-8000-000000000001","traceId":"trace-fixture","seq":0,"occurredAt":"2026-07-18T00:00:00.000Z","type":"run.started"}
+{"requestId":"00000000-0000-4000-8000-000000000001","traceId":"trace-fixture","seq":1,"occurredAt":"2026-07-18T00:00:00.001Z","type":"run.status","status":"retrieving"}
+{"requestId":"00000000-0000-4000-8000-000000000001","traceId":"trace-fixture","seq":2,"occurredAt":"2026-07-18T00:00:00.002Z","type":"text.delta","text":"答案"}
+{"requestId":"00000000-0000-4000-8000-000000000001","traceId":"trace-fixture","seq":3,"occurredAt":"2026-07-18T00:00:00.003Z","type":"citation","citationId":"00000000-0000-4000-8000-000000000002","title":"示例文档","snippet":"示例证据","location":{"page":1}}
+{"requestId":"00000000-0000-4000-8000-000000000001","traceId":"trace-fixture","seq":4,"occurredAt":"2026-07-18T00:00:00.004Z","type":"text.delta","text":"完成"}
+{"requestId":"00000000-0000-4000-8000-000000000001","traceId":"trace-fixture","seq":5,"occurredAt":"2026-07-18T00:00:00.005Z","type":"run.completed","finishReason":"stop"}
