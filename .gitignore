@@ -4,10 +4,16 @@
 .env.*
 !.env.example
 node_modules/
+**/node_modules/
 dist/
+**/dist/
 coverage/
 __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+**/.venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
 *.log

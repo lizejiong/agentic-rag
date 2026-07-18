@@ -1,0 +1,20 @@
+{
+  "name": "enterprise-rag",
+  "private": true,
+  "packageManager": "pnpm@11.14.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "check:workspace": "node scripts/check-workspace.mjs",
+    "dev:web": "pnpm --filter @rag/web dev",
+    "dev:api": "pnpm --filter @rag/api start:dev",
+    "dev:ai": "uv run --project services/ai uvicorn rag_ai.main:app --reload --port 8001",
+    "prepare:contracts": "pnpm --filter @rag/contracts build",
+    "lint": "pnpm prepare:contracts && pnpm -r --if-present lint && uv run --project services/ai ruff check services/ai",
+    "typecheck": "pnpm prepare:contracts && pnpm -r --if-present typecheck && uv run --project services/ai mypy services/ai/src",
+    "test": "pnpm prepare:contracts && pnpm -r --if-present test && uv run --project services/ai pytest services/ai/tests",
+    "build": "pnpm -r --if-present build && uv build --project services/ai",
+    "smoke:chat": "node scripts/smoke-chat.mjs"
+  }
+}
