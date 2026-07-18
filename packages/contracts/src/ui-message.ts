@@ -1,21 +1,16 @@
 import type { UIMessage } from 'ai';
 
+import type { AgentEvent } from './agent-events';
+
+type AgentStatus = Extract<AgentEvent, { type: 'run.status' }>['status'];
+type AgentCitation = Extract<AgentEvent, { type: 'citation' }>;
+
 export type RagUIDataParts = {
   'agent-status': {
-    status: 'understanding' | 'retrieving' | 'ranking' | 'answering' | 'cancelled';
-    seq: number;
+    status: AgentStatus | 'cancelled';
+    seq: AgentEvent['seq'];
   };
-  citation: {
-    citationId: string;
-    title: string;
-    snippet: string;
-    location: {
-      page?: number;
-      slide?: number;
-      sheet?: string;
-      cellRange?: string;
-    };
-  };
+  citation: Pick<AgentCitation, 'citationId' | 'title' | 'snippet' | 'location'>;
 };
 
 export type RagUIMessage = UIMessage<never, RagUIDataParts>;
