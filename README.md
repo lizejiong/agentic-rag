@@ -27,6 +27,7 @@ packages/contracts 共享 TypeScript 契约
 
 - [服务边界与信任模型](docs/architecture/001-service-boundaries.md)
 - [流式事件、背压与取消契约](docs/architecture/002-streaming-contract.md)
+- [Phase 1 依赖与目录决策](docs/architecture/003-phase1-library-and-layout-decisions.md)
 - [本地快速启动](docs/development/quickstart.md)
 - [完整 PRD](docs/superpowers/specs/2026-07-17-enterprise-agentic-rag-prd-design.md)
 
