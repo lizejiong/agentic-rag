@@ -58,11 +58,11 @@ services/ai/
 - 新建：`docs/architecture/003-phase1-library-and-layout-decisions.md`
 - 修改：`README.md`
 
-- [ ] **步骤 1：写入 ADR**
+- [x] **步骤 1：写入 ADR**
 
 ADR 必须记录每个候选项的“采用/不采用、原因、退出策略、许可证”，至少覆盖 Prisma、Argon2、JWT、Redis client、BullMQ、Keycloak、Testcontainers，以及上述目录边界。
 
-- [ ] **步骤 2：在 README 中增加架构决策入口**
+- [x] **步骤 2：在 README 中增加架构决策入口**
 
 在“关键设计”列表加入：
 
@@ -70,7 +70,7 @@ ADR 必须记录每个候选项的“采用/不采用、原因、退出策略、
 - [Phase 1 依赖与目录决策](docs/architecture/003-phase1-library-and-layout-decisions.md)
 ```
 
-- [ ] **步骤 3：验证并提交**
+- [x] **步骤 3：验证并提交**
 
 运行：`git diff --check`
 
@@ -91,7 +91,7 @@ git commit -m "docs: record phase one architecture decisions"
 - 修改：`package.json`
 - 修改：`.gitignore`
 
-- [ ] **步骤 1：定义固定服务和持久卷**
+- [x] **步骤 1：定义固定服务和持久卷**
 
 `compose.yaml` 定义 `postgres`、`elasticsearch`、`neo4j`、`redis`、`minio`、一次性 `minio-init`。PostgreSQL 镜像必须包含 pgvector；所有长期服务必须设置 healthcheck、资源上限、命名卷和 `restart: unless-stopped`。Elasticsearch 以单节点、禁用遥测的开发模式运行，但仍设置密码。
 
@@ -105,7 +105,7 @@ Redis 6379
 MinIO API 9000 / Console 9001
 ```
 
-- [ ] **步骤 2：提供无密钥默认模板**
+- [x] **步骤 2：提供无密钥默认模板**
 
 `.env.example` 只提供开发占位值和变量说明；真实 `.env` 保持忽略。至少包含：
 
@@ -120,7 +120,7 @@ MINIO_ROOT_USER=atlas
 MINIO_ROOT_PASSWORD=change-me-now
 ```
 
-- [ ] **步骤 3：实现基础设施健康检查**
+- [x] **步骤 3：实现基础设施健康检查**
 
 `scripts/check-infrastructure.mjs` 调用各服务公开健康端点/协议，失败时输出服务名和修复命令，成功时输出：
 
@@ -138,7 +138,7 @@ Infrastructure is healthy: postgres, elasticsearch, neo4j, redis, minio
 }
 ```
 
-- [ ] **步骤 4：从空卷启动并验证**
+- [x] **步骤 4：从空卷启动并验证**
 
 运行：
 
@@ -150,7 +150,7 @@ pnpm infra:check
 
 预期：五个长期服务均为 healthy，MinIO bucket `atlas-rag` 已创建。
 
-- [ ] **步骤 5：提交**
+- [x] **步骤 5：提交**
 
 ```bash
 git add infra scripts/check-infrastructure.mjs package.json .gitignore
