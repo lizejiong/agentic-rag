@@ -1,9 +1,10 @@
+import json
 from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
 
-from rag_ai.contracts.agent_events import TextDelta
+from rag_ai.contracts.agent_events import Citation, CitationLocation, TextDelta
 from rag_ai.streaming.ndjson import MAX_NDJSON_BYTES, encode_ndjson
 
 
@@ -38,3 +39,21 @@ def test_encode_ndjson_rejects_record_exactly_64_kib() -> None:
     assert len(encoded) == MAX_NDJSON_BYTES
     with pytest.raises(ValueError, match="64 KiB"):
         encode_ndjson(event)
+
+
+def test_encode_ndjson_omits_unset_citation_location_fields() -> None:
+    event = Citation(
+        requestId=UUID("00000000-0000-4000-8000-000000000001"),
+        traceId="trace-test",
+        seq=0,
+        occurredAt=datetime(2026, 7, 18, tzinfo=UTC),
+        type="citation",
+        citationId=UUID("00000000-0000-4000-8000-000000000002"),
+        title="协议示例文档",
+        snippet="仅用于测试。",
+        location=CitationLocation(page=1),
+    )
+
+    payload = json.loads(encode_ndjson(event))
+
+    assert payload["location"] == {"page": 1}

@@ -52,6 +52,23 @@ def test_nested_location_rejects_unknown_fields() -> None:
         agent_event_adapter.validate_python(payload)
 
 
+def test_citation_location_rejects_explicit_null() -> None:
+    payload = {
+        "requestId": "00000000-0000-4000-8000-000000000001",
+        "traceId": "trace-fixture",
+        "seq": 0,
+        "occurredAt": "2026-07-18T00:00:00.000Z",
+        "type": "citation",
+        "citationId": "00000000-0000-4000-8000-000000000002",
+        "title": "协议示例文档",
+        "snippet": "仅用于测试。",
+        "location": {"page": 1, "slide": None},
+    }
+
+    with pytest.raises(ValidationError):
+        agent_event_adapter.validate_python(payload)
+
+
 def test_run_request_is_strict_and_trims_question() -> None:
     request = RunRequest(
         requestId=UUID("00000000-0000-4000-8000-000000000010"),

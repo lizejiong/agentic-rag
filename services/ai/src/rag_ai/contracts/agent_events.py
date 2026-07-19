@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Literal, TypeAlias
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictModel(BaseModel):
@@ -35,6 +35,16 @@ class CitationLocation(StrictModel):
     slide: int | None = Field(default=None, ge=1)
     sheet: str | None = Field(default=None, min_length=1)
     cellRange: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_explicit_nulls(cls, value: object) -> object:
+        location_fields = ("page", "slide", "sheet", "cellRange")
+        if isinstance(value, dict) and any(
+            field in value and value[field] is None for field in location_fields
+        ):
+            raise ValueError("citation location fields cannot be null")
+        return value
 
 
 class Citation(EventBase):

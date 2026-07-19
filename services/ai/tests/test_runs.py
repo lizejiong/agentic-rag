@@ -1,8 +1,10 @@
 import json
+from uuid import UUID
 
 from starlette.testclient import TestClient
 
 from rag_ai.main import app
+from rag_ai.runtime.registry import run_registry
 
 REQUEST_ID = "00000000-0000-4000-8000-000000000001"
 
@@ -37,3 +39,24 @@ def test_cancel_is_idempotent() -> None:
     assert first_response.json() == {"status": "cancelling"}
     assert second_response.status_code == 202
     assert second_response.json() == {"status": "cancelling"}
+
+
+def test_duplicate_active_run_returns_conflict_before_streaming() -> None:
+    client = TestClient(app)
+    request_id = UUID("00000000-0000-4000-8000-000000000024")
+    active = run_registry.acquire(request_id)
+    payload = {
+        "requestId": str(request_id),
+        "traceId": "trace-duplicate",
+        "actorId": "actor-test",
+        "question": "重复运行",
+        "selectedSpaceIds": [],
+    }
+
+    try:
+        response = client.post("/v1/agent/runs", json=payload)
+    finally:
+        run_registry.release(request_id, active)
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": "REQUEST_ALREADY_RUNNING"}
