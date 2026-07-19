@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@11.14.0",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "check:workspace": "node scripts/check-workspace.mjs",
