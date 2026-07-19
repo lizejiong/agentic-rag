@@ -22,6 +22,9 @@ importers:
       '@rag/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      ai:
+        specifier: 7.0.31
+        version: 7.0.31(zod@4.4.3)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
