@@ -30,8 +30,8 @@ def test_run_streams_ordered_ndjson_events() -> None:
 def test_cancel_is_idempotent() -> None:
     client = TestClient(app)
 
-    first_response = client.post(f"/v1/agent/runs/{REQUEST_ID}/cancel")
-    second_response = client.post(f"/v1/agent/runs/{REQUEST_ID}/cancel")
+    first_response = client.delete(f"/v1/agent/runs/{REQUEST_ID}")
+    second_response = client.delete(f"/v1/agent/runs/{REQUEST_ID}")
 
     assert first_response.status_code == 202
     assert first_response.json() == {"status": "cancelling"}

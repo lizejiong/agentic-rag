@@ -26,7 +26,7 @@ async def run_agent(request: RunRequest) -> StreamingResponse:
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
 
-@router.post("/{request_id}/cancel", status_code=202)
+@router.delete("/{request_id}", status_code=202)
 async def cancel_run(request_id: UUID) -> JSONResponse:
     run_registry.cancel(request_id)
     return JSONResponse(status_code=202, content={"status": "cancelling"})
