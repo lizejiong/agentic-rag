@@ -264,7 +264,7 @@ git commit -m "feat: add application database schema"
 - 新建：`services/ai/tests/test_database_settings.py`
 - 修改：`services/ai/pyproject.toml`
 
-- [ ] **步骤 1：安装数据库迁移依赖**
+- [x] **步骤 1：安装数据库迁移依赖**
 
 运行：
 
@@ -272,7 +272,7 @@ git commit -m "feat: add application database schema"
 uv add --project services/ai sqlalchemy alembic "psycopg[binary]"
 ```
 
-- [ ] **步骤 2：约束迁移归属**
+- [x] **步骤 2：约束迁移归属**
 
 Alembic 的 `version_table_schema` 固定为 `rag`，首个 migration 只执行：
 
@@ -283,7 +283,7 @@ op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
 Python migration 禁止创建或修改 `app` schema。
 
-- [ ] **步骤 3：执行和验证**
+- [x] **步骤 3：执行和验证**
 
 运行：
 
@@ -294,7 +294,7 @@ uv run --project services/ai pytest services/ai/tests/test_database_settings.py 
 
 预期：`rag.alembic_version` 存在，`app` 表没有变化。
 
-- [ ] **步骤 4：提交**
+- [x] **步骤 4：提交**
 
 ```bash
 git add services/ai
