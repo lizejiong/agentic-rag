@@ -19,6 +19,8 @@ const environmentSchema = z
     JWT_ACCESS_SECRET: z.string().min(32),
     JWT_REFRESH_PEPPER: z.string().min(32),
     COOKIE_SECURE: booleanValue,
+    BOOTSTRAP_ADMIN_USERNAME: z.string().trim().min(1).optional(),
+    BOOTSTRAP_ADMIN_PASSWORD: z.string().min(12).optional(),
   })
   .superRefine((environment, context) => {
     if (environment.JWT_ACCESS_SECRET === environment.JWT_REFRESH_PEPPER) {
@@ -41,6 +43,16 @@ const environmentSchema = z
       context.addIssue({
         code: 'custom',
         message: 'Production configuration cannot contain example secrets.',
+      });
+    }
+
+    if (
+      Boolean(environment.BOOTSTRAP_ADMIN_USERNAME) !==
+      Boolean(environment.BOOTSTRAP_ADMIN_PASSWORD)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Bootstrap admin username and password must be configured together.',
       });
     }
   });

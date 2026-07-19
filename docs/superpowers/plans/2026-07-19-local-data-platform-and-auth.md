@@ -318,7 +318,7 @@ git commit -m "feat: add rag database migration boundary"
 - 修改：`apps/api/src/app.module.ts`
 - 修改：`apps/api/src/chat/chat.controller.ts`
 
-- [ ] **步骤 1：安装安全依赖**
+- [x] **步骤 1：安装安全依赖**
 
 运行：
 
@@ -327,7 +327,7 @@ pnpm --filter @rag/api add @nestjs/jwt argon2 cookie-parser
 pnpm --filter @rag/api add -D @types/cookie-parser
 ```
 
-- [ ] **步骤 2：实现密码与认证主体**
+- [x] **步骤 2：实现密码与认证主体**
 
 密码只通过 Argon2id 保存：
 
@@ -342,19 +342,19 @@ export type AuthenticatedUser = {
 
 Access token 有效期 15 分钟，至少包含 `sub`、`role`、`tokenVersion`、`jti`，不包含密码、部门或 ACL 列表。
 
-- [ ] **步骤 3：实现首个管理员引导**
+- [x] **步骤 3：实现首个管理员引导**
 
 `prisma/seed.ts` 仅在用户表为空且存在 `BOOTSTRAP_ADMIN_USERNAME`、`BOOTSTRAP_ADMIN_PASSWORD` 时创建管理员。已有用户时不修改任何密码。
 
-- [ ] **步骤 4：实现账号管理**
+- [x] **步骤 4：实现账号管理**
 
 仅管理员可创建、禁用、启用和重置账号。禁用和重置操作递增目标用户 `tokenVersion`，使现有 access token 失效。
 
-- [ ] **步骤 5：替换占位身份**
+- [x] **步骤 5：替换占位身份**
 
 `POST /chat/stream` 和取消端点使用 `AccessTokenGuard`；传给 Python 的 `userId` 来自验证后的 `AuthenticatedUser.id`，彻底删除 `foundation-user`。
 
-- [ ] **步骤 6：验证并提交**
+- [x] **步骤 6：验证并提交**
 
 运行：
 

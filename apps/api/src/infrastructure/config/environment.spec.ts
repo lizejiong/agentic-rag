@@ -37,4 +37,13 @@ describe('parseEnvironment', () => {
       }),
     ).toThrow(/example secrets/);
   });
+
+  it('requires bootstrap administrator credentials as a pair', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        BOOTSTRAP_ADMIN_USERNAME: 'admin',
+      }),
+    ).toThrow(/configured together/);
+  });
 });

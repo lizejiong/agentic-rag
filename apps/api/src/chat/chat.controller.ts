@@ -16,6 +16,8 @@ import type { Request, Response } from 'express';
 
 import { AI_EVENT_SOURCE, type AiEventSource } from '../ai/ai-event-source';
 import { AiStreamMapper } from '../ai/ai-stream.mapper';
+import { AccessTokenGuard } from '../auth/access-token.guard';
+import type { AuthenticatedRequest } from '../auth/current-user.decorator';
 import { ActiveRunRegistry } from './active-run.registry';
 import { ChatProtocolGuard } from './chat-protocol.guard';
 import { chatRequestSchema, type ChatRequest } from './chat.request';
@@ -49,8 +51,8 @@ export class ChatController {
   ) {}
 
   @Post('stream')
-  @UseGuards(ChatProtocolGuard)
-  async stream(@Req() req: Request, @Res() res: Response): Promise<void> {
+  @UseGuards(AccessTokenGuard, ChatProtocolGuard)
+  async stream(@Req() req: AuthenticatedRequest, @Res() res: Response): Promise<void> {
     const parsed = chatRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new BadRequestException('INVALID_CHAT_REQUEST');
@@ -80,7 +82,7 @@ export class ChatController {
               {
                 requestId,
                 traceId: req.header('x-trace-id')?.trim() || randomUUID(),
-                actorId: 'foundation-user',
+                actorId: req.user.id,
                 question,
                 selectedSpaceIds: parsed.data.selectedSpaceIds,
               },
@@ -107,6 +109,7 @@ export class ChatController {
   }
 
   @Post(':requestId/cancel')
+  @UseGuards(AccessTokenGuard)
   async cancel(
     @Param('requestId', new ParseUUIDPipe()) requestId: string,
   ): Promise<{ status: 'cancelling' }> {

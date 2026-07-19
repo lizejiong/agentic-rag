@@ -1,15 +1,28 @@
 import type { Server } from 'node:http';
 
-import type { INestApplication } from '@nestjs/common';
+import type { ExecutionContext, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { AgentEvent, RunRequest } from '@rag/contracts';
 import request from 'supertest';
 
 import { AI_EVENT_SOURCE, type AiEventSource } from '../ai/ai-event-source';
+import { AccessTokenGuard } from '../auth/access-token.guard';
+import type { AuthenticatedRequest } from '../auth/current-user.decorator';
 import { ActiveRunRegistry } from './active-run.registry';
 import { ChatController } from './chat.controller';
 
 const REQUEST_ID = '00000000-0000-4000-8000-000000000010';
+const testAuthGuard = {
+  canActivate(context: ExecutionContext): boolean {
+    context.switchToHttp().getRequest<AuthenticatedRequest>().user = {
+      id: '00000000-0000-4000-8000-000000000001',
+      username: 'tester',
+      role: 'MEMBER',
+      tokenVersion: 0,
+    };
+    return true;
+  },
+};
 
 class FakeAiEventSource implements AiEventSource {
   lastRequest: RunRequest | undefined;
@@ -55,7 +68,10 @@ describe('ChatController', () => {
     const module = await Test.createTestingModule({
       controllers: [ChatController],
       providers: [ActiveRunRegistry, { provide: AI_EVENT_SOURCE, useValue: fake }],
-    }).compile();
+    })
+      .overrideGuard(AccessTokenGuard)
+      .useValue(testAuthGuard)
+      .compile();
     app = module.createNestApplication();
     await app.init();
   });
