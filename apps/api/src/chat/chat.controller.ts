@@ -9,6 +9,7 @@ import {
   Post,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import type { RagUIMessage } from '@rag/contracts';
 import type { Request, Response } from 'express';
@@ -16,6 +17,7 @@ import type { Request, Response } from 'express';
 import { AI_EVENT_SOURCE, type AiEventSource } from '../ai/ai-event-source';
 import { AiStreamMapper } from '../ai/ai-stream.mapper';
 import { ActiveRunRegistry } from './active-run.registry';
+import { ChatProtocolGuard } from './chat-protocol.guard';
 import { chatRequestSchema, type ChatRequest } from './chat.request';
 
 function extractQuestion(messages: ChatRequest['messages']): string {
@@ -47,6 +49,7 @@ export class ChatController {
   ) {}
 
   @Post('stream')
+  @UseGuards(ChatProtocolGuard)
   async stream(@Req() req: Request, @Res() res: Response): Promise<void> {
     const parsed = chatRequestSchema.safeParse(req.body);
     if (!parsed.success) {

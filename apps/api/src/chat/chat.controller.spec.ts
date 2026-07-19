@@ -67,6 +67,7 @@ describe('ChatController', () => {
   it('streams AI SDK SSE data and preserves the request ID', async () => {
     const response = await request(app.getHttpServer() as Server)
       .post('/chat/stream')
+      .set('x-chat-protocol-version', '1')
       .set('x-trace-id', 'trace-fixed')
       .send({
         id: 'message-root',
@@ -97,6 +98,7 @@ describe('ChatController', () => {
   it('rejects a request without a user text question', async () => {
     await request(app.getHttpServer() as Server)
       .post('/chat/stream')
+      .set('x-chat-protocol-version', '1')
       .send({
         id: 'message-root',
         requestId: REQUEST_ID,

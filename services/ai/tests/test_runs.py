@@ -1,9 +1,13 @@
 import json
 from uuid import UUID
 
+import pytest
 from starlette.testclient import TestClient
 
+from rag_ai.contracts.agent_events import RunRequest
 from rag_ai.main import app
+from rag_ai.routes.runs import cancel_run
+from rag_ai.runtime.fake_agent import fake_agent_events
 from rag_ai.runtime.registry import run_registry
 
 REQUEST_ID = "00000000-0000-4000-8000-000000000001"
@@ -60,3 +64,30 @@ def test_duplicate_active_run_returns_conflict_before_streaming() -> None:
 
     assert response.status_code == 409
     assert response.json() == {"detail": "REQUEST_ALREADY_RUNNING"}
+
+
+@pytest.mark.asyncio
+async def test_cancel_route_stops_an_active_generator() -> None:
+    request_id = UUID("00000000-0000-4000-8000-000000000025")
+    request = RunRequest(
+        requestId=request_id,
+        traceId="trace-cancel",
+        actorId="actor-test",
+        question="验证取消传播",
+        selectedSpaceIds=[],
+    )
+    cancelled = run_registry.acquire(request_id)
+    events = []
+
+    try:
+        stream = fake_agent_events(request, cancelled)
+        async for event in stream:
+            events.append(event)
+            if event.type == "text.delta":
+                response = await cancel_run(request_id)
+                assert response.status_code == 202
+    finally:
+        run_registry.release(request_id, cancelled)
+
+    assert events[-1].type == "run.completed"
+    assert events[-1].finishReason == "cancelled"
