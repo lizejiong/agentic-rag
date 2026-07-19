@@ -173,7 +173,7 @@ git commit -m "infra: add local data platform compose"
 - 修改：`package.json`
 - 修改：`.env.example`
 
-- [ ] **步骤 1：安装并固定 Prisma**
+- [x] **步骤 1：安装并固定 Prisma**
 
 运行：
 
@@ -184,7 +184,7 @@ pnpm --filter @rag/api add -D prisma tsx @types/pg
 
 提交前确认 `pnpm-lock.yaml` 中 Prisma Client 和 CLI 为同一版本。
 
-- [ ] **步骤 2：定义最小但可扩展的数据模型**
+- [x] **步骤 2：定义最小但可扩展的数据模型**
 
 `schema.prisma` 使用 PostgreSQL `app` schema，并定义：
 
@@ -223,11 +223,11 @@ model AuthorizationState {
 
 同一 schema 中补齐 `Department`、`Group`、`GroupMember`、`KnowledgeSpace`、`SpaceGrant`、`Document`、`DocumentAclEntry`、`RefreshSession`、`AuditLog`、`OutboxEvent` 和 `ProcessedEvent`。`SpaceGrant` 使用 `(spaceId, subjectType, subjectId)` 唯一约束；`DocumentAclEntry` 使用 `(documentId, subjectType, subjectId)` 唯一约束；`OutboxEvent.eventId` 和 `ProcessedEvent.eventId` 都必须唯一。
 
-- [ ] **步骤 3：实现配置的启动即失败校验**
+- [x] **步骤 3：实现配置的启动即失败校验**
 
 `environment.ts` 使用 Zod 校验数据库、Redis、JWT、cookie 和服务 URL。生产环境拒绝示例密码，JWT access/refresh secret 不得相同。
 
-- [ ] **步骤 4：生成并执行迁移**
+- [x] **步骤 4：生成并执行迁移**
 
 运行：
 
@@ -239,7 +239,7 @@ pnpm --filter @rag/api prisma db seed
 
 预期：PostgreSQL 出现 `app` schema；`AuthorizationState` 存在且 revision 为 `0`。
 
-- [ ] **步骤 5：运行配置和数据库测试并提交**
+- [x] **步骤 5：运行配置和数据库测试并提交**
 
 运行：
 
