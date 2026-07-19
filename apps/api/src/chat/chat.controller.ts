@@ -70,35 +70,40 @@ export class ChatController {
       }
     });
 
-    const { createUIMessageStream, pipeUIMessageStreamToResponse } = await import('ai');
-    const stream = createUIMessageStream<RagUIMessage>({
-      execute: async ({ writer }) => {
-        const mapper = new AiStreamMapper((chunk) => writer.write(chunk));
-        try {
-          for await (const event of this.ai.run(
-            {
-              requestId,
-              traceId: req.header('x-trace-id')?.trim() || randomUUID(),
-              actorId: 'foundation-user',
-              question,
-              selectedSpaceIds: parsed.data.selectedSpaceIds,
-            },
-            abort.signal,
-          )) {
-            mapper.write(event);
+    try {
+      const { createUIMessageStream, pipeUIMessageStreamToResponse } = await import('ai');
+      const stream = createUIMessageStream<RagUIMessage>({
+        execute: async ({ writer }) => {
+          const mapper = new AiStreamMapper((chunk) => writer.write(chunk));
+          try {
+            for await (const event of this.ai.run(
+              {
+                requestId,
+                traceId: req.header('x-trace-id')?.trim() || randomUUID(),
+                actorId: 'foundation-user',
+                question,
+                selectedSpaceIds: parsed.data.selectedSpaceIds,
+              },
+              abort.signal,
+            )) {
+              mapper.write(event);
+            }
+          } catch (error) {
+            if (!abort.signal.aborted) {
+              throw error;
+            }
+          } finally {
+            this.activeRuns.finish(requestId, abort);
           }
-        } catch (error) {
-          if (!abort.signal.aborted) {
-            throw error;
-          }
-        } finally {
-          this.activeRuns.finish(requestId, abort);
-        }
-      },
-      onError: () => 'AI stream failed',
-    });
+        },
+        onError: () => 'AI stream failed',
+      });
 
-    pipeUIMessageStreamToResponse({ response: res, stream });
+      pipeUIMessageStreamToResponse({ response: res, stream });
+    } catch (error) {
+      this.activeRuns.finish(requestId, abort);
+      throw error;
+    }
   }
 
   @Post(':requestId/cancel')
