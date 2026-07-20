@@ -150,25 +150,35 @@ export class AuthorizationService {
       throw new NotFoundException('DOCUMENT_NOT_FOUND');
     }
     await this.requireSpace(user, document.spaceId, 'MANAGE');
-    await this.revision.mutate(async (transaction) => {
-      for (const entry of entries) {
-        const count =
-          entry.subjectType === 'USER'
-            ? await transaction.user.count({ where: { id: entry.subjectId } })
-            : entry.subjectType === 'DEPARTMENT'
-              ? await transaction.department.count({ where: { id: entry.subjectId } })
-              : await transaction.userGroup.count({ where: { id: entry.subjectId } });
-        if (count === 0) {
-          throw new NotFoundException('DOCUMENT_ACL_SUBJECT_NOT_FOUND');
+    await this.revision.mutate(
+      async (transaction) => {
+        for (const entry of entries) {
+          const count =
+            entry.subjectType === 'USER'
+              ? await transaction.user.count({ where: { id: entry.subjectId } })
+              : entry.subjectType === 'DEPARTMENT'
+                ? await transaction.department.count({ where: { id: entry.subjectId } })
+                : await transaction.userGroup.count({ where: { id: entry.subjectId } });
+          if (count === 0) {
+            throw new NotFoundException('DOCUMENT_ACL_SUBJECT_NOT_FOUND');
+          }
         }
-      }
-      await transaction.documentAclEntry.deleteMany({ where: { documentId } });
-      if (entries.length > 0) {
-        await transaction.documentAclEntry.createMany({
-          data: entries.map((entry) => ({ documentId, ...entry })),
-        });
-      }
-    });
+        await transaction.documentAclEntry.deleteMany({ where: { documentId } });
+        if (entries.length > 0) {
+          await transaction.documentAclEntry.createMany({
+            data: entries.map((entry) => ({ documentId, ...entry })),
+          });
+        }
+      },
+      {
+        action: 'document.acl.replace',
+        targetType: 'DOCUMENT',
+        targetId: documentId,
+        eventType: 'document.authorization.changed',
+        resourceId: documentId,
+        payload: { subjects: entries },
+      },
+    );
   }
 
   async setDocumentAvailability(
@@ -188,11 +198,20 @@ export class AuthorizationService {
       document.spaceId,
       availability === 'SOFT_DELETED' ? 'MANAGE' : 'EDIT',
     );
-    return this.revision.mutate((transaction) =>
-      transaction.document.update({
-        where: { id: documentId },
-        data: { availability },
-      }),
+    return this.revision.mutate(
+      (transaction) =>
+        transaction.document.update({
+          where: { id: documentId },
+          data: { availability },
+        }),
+      {
+        action: 'document.availability.set',
+        targetType: 'DOCUMENT',
+        targetId: documentId,
+        eventType: 'document.availability.changed',
+        resourceId: documentId,
+        payload: { availability },
+      },
     );
   }
 

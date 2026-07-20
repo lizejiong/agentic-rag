@@ -78,6 +78,8 @@ describe('Local account authentication', () => {
     const createResponse = await request(app.getHttpServer() as Server)
       .post('/users')
       .set('authorization', `Bearer ${adminLogin.accessToken}`)
+      .set('x-request-id', 'auth-e2e-create-user')
+      .set('x-trace-id', 'auth-e2e-trace')
       .send({
         username: MEMBER_USERNAME,
         displayName: 'E2E Member',
@@ -86,6 +88,16 @@ describe('Local account authentication', () => {
       })
       .expect(201);
     const member = createdUserSchema.parse(createResponse.body as unknown);
+    await expect(
+      prisma.auditLog.findFirstOrThrow({
+        where: { action: 'user.create', targetId: member.id },
+      }),
+    ).resolves.toMatchObject({
+      actorId: adminLogin.user.id,
+      actorUsername: ADMIN_USERNAME,
+      requestId: 'auth-e2e-create-user',
+      traceId: 'auth-e2e-trace',
+    });
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       await request(app.getHttpServer() as Server)

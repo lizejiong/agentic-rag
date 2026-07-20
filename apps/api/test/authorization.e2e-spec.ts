@@ -227,15 +227,24 @@ describe('Unified resource authorization', () => {
       where: { id: 1 },
       select: { revision: true },
     });
-    await revision.mutate(async (transaction) => {
-      await transaction.spaceGrant.deleteMany({
-        where: {
-          spaceId: space.id,
-          subjectType: 'USER',
-          subjectId: directUser.id,
-        },
-      });
-    });
+    await revision.mutate(
+      async (transaction) => {
+        await transaction.spaceGrant.deleteMany({
+          where: {
+            spaceId: space.id,
+            subjectType: 'USER',
+            subjectId: directUser.id,
+          },
+        });
+      },
+      {
+        action: 'test.space.grant.delete',
+        targetType: 'SPACE_GRANT',
+        targetId: directUser.id,
+        eventType: 'space.authorization.changed',
+        resourceId: space.id,
+      },
+    );
     const afterRevoke = await prisma.authorizationState.findUniqueOrThrow({
       where: { id: 1 },
       select: { revision: true },
@@ -243,20 +252,36 @@ describe('Unified resource authorization', () => {
     expect(afterRevoke.revision).toBe(beforeRevoke.revision + 1n);
     await probeDocument(server, tokens.direct, inheritedDocument.id, 403);
 
-    await revision.mutate((transaction) =>
-      transaction.knowledgeSpace.update({
-        where: { id: space.id },
-        data: { status: 'ARCHIVED' },
-      }),
+    await revision.mutate(
+      (transaction) =>
+        transaction.knowledgeSpace.update({
+          where: { id: space.id },
+          data: { status: 'ARCHIVED' },
+        }),
+      {
+        action: 'test.space.archive',
+        targetType: 'KNOWLEDGE_SPACE',
+        targetId: space.id,
+        eventType: 'space.status.changed',
+        resourceId: space.id,
+      },
     );
     await probeDocument(server, tokens.department, inheritedDocument.id, 403);
     await probeDocument(server, tokens.admin, inheritedDocument.id, 403);
 
-    await revision.mutate((transaction) =>
-      transaction.user.update({
-        where: { id: groupUser.id },
-        data: { status: 'DISABLED', tokenVersion: { increment: 1 } },
-      }),
+    await revision.mutate(
+      (transaction) =>
+        transaction.user.update({
+          where: { id: groupUser.id },
+          data: { status: 'DISABLED', tokenVersion: { increment: 1 } },
+        }),
+      {
+        action: 'test.user.disable',
+        targetType: 'USER',
+        targetId: groupUser.id,
+        eventType: 'user.status.changed',
+        resourceId: groupUser.id,
+      },
     );
     await probeDocument(server, tokens.group, groupDocument.id, 401);
   });

@@ -534,7 +534,7 @@ git commit -m "feat: enforce unified resource authorization"
 - 新建：`apps/api/src/outbox/outbox.types.ts`
 - 新建：`apps/api/src/outbox/outbox.service.spec.ts`
 
-- [ ] **步骤 1：定义事件信封**
+- [x] **步骤 1：定义事件信封**
 
 ```ts
 export type OutboxEnvelope<T extends Record<string, unknown>> = {
@@ -550,15 +550,15 @@ export type OutboxEnvelope<T extends Record<string, unknown>> = {
 };
 ```
 
-- [ ] **步骤 2：实现同事务写入**
+- [x] **步骤 2：实现同事务写入**
 
 用户、授权、空间和文档状态的变更必须使用同一个 Prisma transaction 同时写业务记录、`AuditLog`、`OutboxEvent` 和 revision。禁止请求完成后再 best-effort 写审计。
 
-- [ ] **步骤 3：保护审计**
+- [x] **步骤 3：保护审计**
 
 API 不提供审计修改和删除；管理员只能分页查询。审计记录包含 actor、action、target、result、IP、request ID、trace ID、reason 和时间，敏感字段在写入前删除。
 
-- [ ] **步骤 4：验证并提交**
+- [x] **步骤 4：验证并提交**
 
 运行：
 
