@@ -427,15 +427,15 @@ git commit -m "feat: add rotating sessions and login limits"
 - 新建：`apps/api/src/spaces/spaces.e2e-spec.ts`
 - 修改：`apps/api/src/app.module.ts`
 
-- [ ] **步骤 1：实现组织 CRUD**
+- [x] **步骤 1：实现组织 CRUD**
 
 管理员可管理部门、用户组和组成员。一个用户最多属于一个部门，可属于多个组。删除被引用主体前返回 409，并给出关联数量。
 
-- [ ] **步骤 2：实现空间 CRUD**
+- [x] **步骤 2：实现空间 CRUD**
 
 空间包含名称、描述、标签、默认语言、LLM/Embedding/Reranker/ASR/TTS 开关、自动图谱开关、数据出网策略和状态。`graphExtractionEnabled=true` 时强制 `llmEnabled=true`。
 
-- [ ] **步骤 3：实现单一权限等级**
+- [x] **步骤 3：实现单一权限等级**
 
 不创建更多系统角色。空间授权只有：
 
@@ -451,7 +451,7 @@ export const permissionRank: Record<SpacePermission, number> = {
 
 管理员天然拥有 `MANAGE`；普通成员从用户、部门和组 grant 中取最高等级。归档空间默认不可用于问答，但管理员仍可查看和恢复。
 
-- [ ] **步骤 4：验证并提交**
+- [x] **步骤 4：验证并提交**
 
 运行：
 
