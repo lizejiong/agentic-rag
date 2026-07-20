@@ -582,19 +582,19 @@ git commit -m "feat: add transactional audit and outbox"
 - 新建：`apps/api/test/outbox-redis.e2e-spec.ts`
 - 修改：`apps/api/src/outbox/outbox.module.ts`
 
-- [ ] **步骤 1：实现 claim + publish**
+- [x] **步骤 1：实现 claim + publish**
 
 发布器每批使用 PostgreSQL `FOR UPDATE SKIP LOCKED` claim 100 条 `PENDING` 事件，`XADD atlas:events` 后标记 `PUBLISHED`。发布前崩溃允许重发，不能把 Redis 当作唯一事件状态。
 
-- [ ] **步骤 2：实现 consumer group**
+- [x] **步骤 2：实现 consumer group**
 
 consumer group 使用 `XREADGROUP`，成功后 `XACK`。业务副作用与 `ProcessedEvent(eventId, consumer)` 唯一记录在同一 PostgreSQL 事务；重复 event ID 只 ACK，不重复写业务。
 
-- [ ] **步骤 3：实现重试和死信**
+- [x] **步骤 3：实现重试和死信**
 
 失败按 `1s, 5s, 30s, 2m, 10m` 退避；第 6 次写入 `atlas:events:dead-letter` 并把 outbox 状态设为 `FAILED`，保留错误码和 trace ID。
 
-- [ ] **步骤 4：验证 Redis 清空与重复投递**
+- [x] **步骤 4：验证 Redis 清空与重复投递**
 
 运行：
 
@@ -604,7 +604,7 @@ pnpm --filter @rag/api test:e2e -- outbox-redis
 
 预期：同一 event 重复投递两次只产生一条副作用；`FLUSHDB` 后 PostgreSQL 用户、空间、授权、任务和 outbox 状态仍完整。
 
-- [ ] **步骤 5：提交**
+- [x] **步骤 5：提交**
 
 ```bash
 git add apps/api

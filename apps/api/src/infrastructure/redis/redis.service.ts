@@ -77,6 +77,86 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     await this.client.publish(channel, message);
   }
 
+  async streamAdd(stream: string, fields: Record<string, string>): Promise<string> {
+    await this.ensureConnected();
+    return this.client.xAdd(stream, '*', fields);
+  }
+
+  async ensureConsumerGroup(stream: string, group: string): Promise<void> {
+    await this.ensureConnected();
+    try {
+      await this.client.xGroupCreate(stream, group, '0', { MKSTREAM: true });
+    } catch (error) {
+      if (!(error instanceof Error) || !error.message.includes('BUSYGROUP')) {
+        throw error;
+      }
+    }
+  }
+
+  async streamReadGroup(input: {
+    stream: string;
+    group: string;
+    consumer: string;
+    count?: number;
+    blockMilliseconds?: number;
+  }): Promise<Array<{ id: string; message: Record<string, string> }>> {
+    await this.ensureConnected();
+    const response: unknown = await this.client.xReadGroup(
+      input.group,
+      input.consumer,
+      { key: input.stream, id: '>' },
+      {
+        COUNT: input.count ?? 100,
+        BLOCK: input.blockMilliseconds ?? 100,
+      },
+    );
+    if (!Array.isArray(response)) {
+      return [];
+    }
+    const entries: Array<{ id: string; message: Record<string, string> }> = [];
+    for (const streamItem of response) {
+      const stream: unknown = streamItem;
+      if (!stream || typeof stream !== 'object' || !('messages' in stream)) {
+        continue;
+      }
+      const messages: unknown = stream.messages;
+      if (!Array.isArray(messages)) {
+        continue;
+      }
+      for (const messageItem of messages) {
+        const entry: unknown = messageItem;
+        if (
+          !entry ||
+          typeof entry !== 'object' ||
+          !('id' in entry) ||
+          typeof entry.id !== 'string' ||
+          !('message' in entry) ||
+          !entry.message ||
+          typeof entry.message !== 'object'
+        ) {
+          continue;
+        }
+        const message = Object.fromEntries(
+          Object.entries(entry.message).filter(
+            (field): field is [string, string] => typeof field[1] === 'string',
+          ),
+        );
+        entries.push({ id: entry.id, message });
+      }
+    }
+    return entries;
+  }
+
+  async streamAck(stream: string, group: string, id: string): Promise<void> {
+    await this.ensureConnected();
+    await this.client.xAck(stream, group, id);
+  }
+
+  async flushDatabase(): Promise<void> {
+    await this.ensureConnected();
+    await this.client.flushDb();
+  }
+
   private async ensureConnected(): Promise<void> {
     if (this.client.isReady) {
       return;
