@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import type { AuthenticatedUser } from '../auth/auth.types';
+import { AuthorizationRevisionService } from '../authorization/authorization-revision.service';
 import type {
   EgressPolicy,
   SpacePermission,
@@ -29,6 +30,7 @@ export class SpacesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly policy: SpacePolicy,
+    private readonly revision: AuthorizationRevisionService,
   ) {}
 
   list(user: AuthenticatedUser) {
@@ -56,56 +58,66 @@ export class SpacesService {
   }
 
   create(user: AuthenticatedUser, input: SpaceSettingsInput & { name: string }) {
-    return this.prisma.knowledgeSpace.create({
-      data: {
-        name: input.name.trim(),
-        description: input.description?.trim() || null,
-        tags: input.tags ?? [],
-        defaultLanguage: input.defaultLanguage ?? 'zh-CN',
-        egressPolicy: input.egressPolicy ?? 'LOCAL_ONLY',
-        llmEnabled: input.graphExtractionEnabled ? true : (input.llmEnabled ?? true),
-        embeddingEnabled: input.embeddingEnabled ?? true,
-        rerankerEnabled: input.rerankerEnabled ?? true,
-        asrEnabled: input.asrEnabled ?? true,
-        ttsEnabled: input.ttsEnabled ?? true,
-        graphExtractionEnabled: input.graphExtractionEnabled ?? false,
-        createdById: user.id,
-      },
-    });
+    return this.revision.mutate((transaction) =>
+      transaction.knowledgeSpace.create({
+        data: {
+          name: input.name.trim(),
+          description: input.description?.trim() || null,
+          tags: input.tags ?? [],
+          defaultLanguage: input.defaultLanguage ?? 'zh-CN',
+          egressPolicy: input.egressPolicy ?? 'LOCAL_ONLY',
+          llmEnabled: input.graphExtractionEnabled ? true : (input.llmEnabled ?? true),
+          embeddingEnabled: input.embeddingEnabled ?? true,
+          rerankerEnabled: input.rerankerEnabled ?? true,
+          asrEnabled: input.asrEnabled ?? true,
+          ttsEnabled: input.ttsEnabled ?? true,
+          graphExtractionEnabled: input.graphExtractionEnabled ?? false,
+          createdById: user.id,
+        },
+      }),
+    );
   }
 
   async update(user: AuthenticatedUser, id: string, input: SpaceSettingsInput) {
     await this.policy.require(user, id, 'EDIT');
-    const current = await this.prisma.knowledgeSpace.findUnique({ where: { id } });
-    if (!current) {
-      throw new NotFoundException('SPACE_NOT_FOUND');
-    }
-    const graphExtractionEnabled = input.graphExtractionEnabled ?? current.graphExtractionEnabled;
-    const llmEnabled = graphExtractionEnabled ? true : (input.llmEnabled ?? current.llmEnabled);
+    return this.revision.mutate(async (transaction) => {
+      const current = await transaction.knowledgeSpace.findUnique({ where: { id } });
+      if (!current) {
+        throw new NotFoundException('SPACE_NOT_FOUND');
+      }
+      const graphExtractionEnabled = input.graphExtractionEnabled ?? current.graphExtractionEnabled;
+      const llmEnabled = graphExtractionEnabled ? true : (input.llmEnabled ?? current.llmEnabled);
 
-    return this.prisma.knowledgeSpace.update({
-      where: { id },
-      data: {
-        ...(input.name !== undefined ? { name: input.name.trim() } : {}),
-        ...('description' in input ? { description: input.description?.trim() || null } : {}),
-        ...(input.tags !== undefined ? { tags: [...new Set(input.tags)] } : {}),
-        ...(input.defaultLanguage !== undefined ? { defaultLanguage: input.defaultLanguage } : {}),
-        ...(input.egressPolicy !== undefined ? { egressPolicy: input.egressPolicy } : {}),
-        ...(input.embeddingEnabled !== undefined
-          ? { embeddingEnabled: input.embeddingEnabled }
-          : {}),
-        ...(input.rerankerEnabled !== undefined ? { rerankerEnabled: input.rerankerEnabled } : {}),
-        ...(input.asrEnabled !== undefined ? { asrEnabled: input.asrEnabled } : {}),
-        ...(input.ttsEnabled !== undefined ? { ttsEnabled: input.ttsEnabled } : {}),
-        graphExtractionEnabled,
-        llmEnabled,
-      },
+      return transaction.knowledgeSpace.update({
+        where: { id },
+        data: {
+          ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+          ...('description' in input ? { description: input.description?.trim() || null } : {}),
+          ...(input.tags !== undefined ? { tags: [...new Set(input.tags)] } : {}),
+          ...(input.defaultLanguage !== undefined
+            ? { defaultLanguage: input.defaultLanguage }
+            : {}),
+          ...(input.egressPolicy !== undefined ? { egressPolicy: input.egressPolicy } : {}),
+          ...(input.embeddingEnabled !== undefined
+            ? { embeddingEnabled: input.embeddingEnabled }
+            : {}),
+          ...(input.rerankerEnabled !== undefined
+            ? { rerankerEnabled: input.rerankerEnabled }
+            : {}),
+          ...(input.asrEnabled !== undefined ? { asrEnabled: input.asrEnabled } : {}),
+          ...(input.ttsEnabled !== undefined ? { ttsEnabled: input.ttsEnabled } : {}),
+          graphExtractionEnabled,
+          llmEnabled,
+        },
+      });
     });
   }
 
   async setStatus(user: AuthenticatedUser, id: string, status: SpaceStatus) {
     await this.policy.require(user, id, 'MANAGE');
-    return this.prisma.knowledgeSpace.update({ where: { id }, data: { status } });
+    return this.revision.mutate((transaction) =>
+      transaction.knowledgeSpace.update({ where: { id }, data: { status } }),
+    );
   }
 
   async upsertGrant(
@@ -120,36 +132,40 @@ export class SpacesService {
   ) {
     await this.policy.require(user, spaceId, 'MANAGE');
     await this.assertSubjectExists(input.subjectType, input.subjectId);
-    return this.prisma.spaceGrant.upsert({
-      where: {
-        spaceId_subjectType_subjectId: {
+    return this.revision.mutate((transaction) =>
+      transaction.spaceGrant.upsert({
+        where: {
+          spaceId_subjectType_subjectId: {
+            spaceId,
+            subjectType: input.subjectType,
+            subjectId: input.subjectId,
+          },
+        },
+        create: {
           spaceId,
           subjectType: input.subjectType,
           subjectId: input.subjectId,
+          permission: input.permission,
+          ...('expiresAt' in input ? { expiresAt: input.expiresAt ?? null } : {}),
         },
-      },
-      create: {
-        spaceId,
-        subjectType: input.subjectType,
-        subjectId: input.subjectId,
-        permission: input.permission,
-        ...('expiresAt' in input ? { expiresAt: input.expiresAt ?? null } : {}),
-      },
-      update: {
-        permission: input.permission,
-        ...('expiresAt' in input ? { expiresAt: input.expiresAt ?? null } : {}),
-      },
-    });
+        update: {
+          permission: input.permission,
+          ...('expiresAt' in input ? { expiresAt: input.expiresAt ?? null } : {}),
+        },
+      }),
+    );
   }
 
   async deleteGrant(user: AuthenticatedUser, spaceId: string, grantId: string): Promise<void> {
     await this.policy.require(user, spaceId, 'MANAGE');
-    const result = await this.prisma.spaceGrant.deleteMany({
-      where: { id: grantId, spaceId },
+    await this.revision.mutate(async (transaction) => {
+      const result = await transaction.spaceGrant.deleteMany({
+        where: { id: grantId, spaceId },
+      });
+      if (result.count === 0) {
+        throw new NotFoundException('SPACE_GRANT_NOT_FOUND');
+      }
     });
-    if (result.count === 0) {
-      throw new NotFoundException('SPACE_GRANT_NOT_FOUND');
-    }
   }
 
   private async assertSubjectExists(type: SubjectType, id: string): Promise<void> {

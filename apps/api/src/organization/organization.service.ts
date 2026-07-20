@@ -1,11 +1,15 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 
+import { AuthorizationRevisionService } from '../authorization/authorization-revision.service';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 
 @Injectable()
 export class OrganizationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly revision: AuthorizationRevisionService,
+  ) {}
 
   listDepartments() {
     return this.prisma.department.findMany({
@@ -16,12 +20,14 @@ export class OrganizationService {
 
   createDepartment(input: { name: string; description?: string | undefined }) {
     return this.withUniqueNameConflict(
-      this.prisma.department.create({
-        data: {
-          name: input.name.trim(),
-          description: input.description?.trim() || null,
-        },
-      }),
+      this.revision.mutate((transaction) =>
+        transaction.department.create({
+          data: {
+            name: input.name.trim(),
+            description: input.description?.trim() || null,
+          },
+        }),
+      ),
     );
   }
 
@@ -33,31 +39,37 @@ export class OrganizationService {
     },
   ) {
     try {
-      return await this.prisma.department.update({
-        where: { id },
-        data: {
-          ...(input.name ? { name: input.name.trim() } : {}),
-          ...('description' in input ? { description: input.description?.trim() || null } : {}),
-        },
-      });
+      return await this.revision.mutate((transaction) =>
+        transaction.department.update({
+          where: { id },
+          data: {
+            ...(input.name ? { name: input.name.trim() } : {}),
+            ...('description' in input ? { description: input.description?.trim() || null } : {}),
+          },
+        }),
+      );
     } catch (error) {
       this.rethrowMutationError(error);
     }
   }
 
   async deleteDepartment(id: string): Promise<void> {
-    const [users, grants] = await Promise.all([
-      this.prisma.user.count({ where: { departmentId: id } }),
-      this.prisma.spaceGrant.count({ where: { subjectType: 'DEPARTMENT', subjectId: id } }),
-    ]);
-    if (users > 0 || grants > 0) {
-      throw new ConflictException({
-        code: 'DEPARTMENT_IN_USE',
-        associations: { users, spaceGrants: grants },
-      });
-    }
     try {
-      await this.prisma.department.delete({ where: { id } });
+      await this.revision.mutate(async (transaction) => {
+        const [users, grants] = await Promise.all([
+          transaction.user.count({ where: { departmentId: id } }),
+          transaction.spaceGrant.count({
+            where: { subjectType: 'DEPARTMENT', subjectId: id },
+          }),
+        ]);
+        if (users > 0 || grants > 0) {
+          throw new ConflictException({
+            code: 'DEPARTMENT_IN_USE',
+            associations: { users, spaceGrants: grants },
+          });
+        }
+        await transaction.department.delete({ where: { id } });
+      });
     } catch (error) {
       this.rethrowMutationError(error);
     }
@@ -71,17 +83,21 @@ export class OrganizationService {
     if (!department || !user) {
       throw new NotFoundException('DEPARTMENT_OR_USER_NOT_FOUND');
     }
-    await this.prisma.user.update({ where: { id: userId }, data: { departmentId } });
+    await this.revision.mutate((transaction) =>
+      transaction.user.update({ where: { id: userId }, data: { departmentId } }),
+    );
   }
 
   async removeDepartmentMember(departmentId: string, userId: string): Promise<void> {
-    const result = await this.prisma.user.updateMany({
-      where: { id: userId, departmentId },
-      data: { departmentId: null },
+    await this.revision.mutate(async (transaction) => {
+      const result = await transaction.user.updateMany({
+        where: { id: userId, departmentId },
+        data: { departmentId: null },
+      });
+      if (result.count === 0) {
+        throw new NotFoundException('DEPARTMENT_MEMBERSHIP_NOT_FOUND');
+      }
     });
-    if (result.count === 0) {
-      throw new NotFoundException('DEPARTMENT_MEMBERSHIP_NOT_FOUND');
-    }
   }
 
   listGroups() {
@@ -93,12 +109,14 @@ export class OrganizationService {
 
   createGroup(input: { name: string; description?: string | undefined }) {
     return this.withUniqueNameConflict(
-      this.prisma.userGroup.create({
-        data: {
-          name: input.name.trim(),
-          description: input.description?.trim() || null,
-        },
-      }),
+      this.revision.mutate((transaction) =>
+        transaction.userGroup.create({
+          data: {
+            name: input.name.trim(),
+            description: input.description?.trim() || null,
+          },
+        }),
+      ),
     );
   }
 
@@ -110,31 +128,35 @@ export class OrganizationService {
     },
   ) {
     try {
-      return await this.prisma.userGroup.update({
-        where: { id },
-        data: {
-          ...(input.name ? { name: input.name.trim() } : {}),
-          ...('description' in input ? { description: input.description?.trim() || null } : {}),
-        },
-      });
+      return await this.revision.mutate((transaction) =>
+        transaction.userGroup.update({
+          where: { id },
+          data: {
+            ...(input.name ? { name: input.name.trim() } : {}),
+            ...('description' in input ? { description: input.description?.trim() || null } : {}),
+          },
+        }),
+      );
     } catch (error) {
       this.rethrowMutationError(error);
     }
   }
 
   async deleteGroup(id: string): Promise<void> {
-    const [members, grants] = await Promise.all([
-      this.prisma.groupMember.count({ where: { groupId: id } }),
-      this.prisma.spaceGrant.count({ where: { subjectType: 'GROUP', subjectId: id } }),
-    ]);
-    if (members > 0 || grants > 0) {
-      throw new ConflictException({
-        code: 'GROUP_IN_USE',
-        associations: { members, spaceGrants: grants },
-      });
-    }
     try {
-      await this.prisma.userGroup.delete({ where: { id } });
+      await this.revision.mutate(async (transaction) => {
+        const [members, grants] = await Promise.all([
+          transaction.groupMember.count({ where: { groupId: id } }),
+          transaction.spaceGrant.count({ where: { subjectType: 'GROUP', subjectId: id } }),
+        ]);
+        if (members > 0 || grants > 0) {
+          throw new ConflictException({
+            code: 'GROUP_IN_USE',
+            associations: { members, spaceGrants: grants },
+          });
+        }
+        await transaction.userGroup.delete({ where: { id } });
+      });
     } catch (error) {
       this.rethrowMutationError(error);
     }
@@ -148,18 +170,24 @@ export class OrganizationService {
     if (!group || !user) {
       throw new NotFoundException('GROUP_OR_USER_NOT_FOUND');
     }
-    await this.prisma.groupMember.upsert({
-      where: { groupId_userId: { groupId, userId } },
-      create: { groupId, userId },
-      update: {},
-    });
+    await this.revision.mutate((transaction) =>
+      transaction.groupMember.upsert({
+        where: { groupId_userId: { groupId, userId } },
+        create: { groupId, userId },
+        update: {},
+      }),
+    );
   }
 
   async removeGroupMember(groupId: string, userId: string): Promise<void> {
-    const result = await this.prisma.groupMember.deleteMany({ where: { groupId, userId } });
-    if (result.count === 0) {
-      throw new NotFoundException('GROUP_MEMBERSHIP_NOT_FOUND');
-    }
+    await this.revision.mutate(async (transaction) => {
+      const result = await transaction.groupMember.deleteMany({
+        where: { groupId, userId },
+      });
+      if (result.count === 0) {
+        throw new NotFoundException('GROUP_MEMBERSHIP_NOT_FOUND');
+      }
+    });
   }
 
   private async withUniqueNameConflict<T>(operation: Promise<T>): Promise<T> {

@@ -477,7 +477,7 @@ git commit -m "feat: add organizations and knowledge spaces"
 - 新建：`apps/api/src/authorization/authorization.service.spec.ts`
 - 新建：`apps/api/test/authorization.e2e-spec.ts`
 
-- [ ] **步骤 1：定义可复用授权接口**
+- [x] **步骤 1：定义可复用授权接口**
 
 ```ts
 export type AuthorizationSnapshot = {
@@ -495,19 +495,19 @@ export type DocumentAccessRequest = {
 };
 ```
 
-- [ ] **步骤 2：实现 revision 缓存**
+- [x] **步骤 2：实现 revision 缓存**
 
 缓存 key 为 `authz:v1:{revision}:{userId}`，TTL 60 秒。任何用户、部门、组、空间 grant、文档 ACL 或文档状态变化都必须在相同 PostgreSQL 事务中递增 `AuthorizationState.revision`；旧缓存自然失效，同时发布主动删除事件。
 
-- [ ] **步骤 3：实现文档 ACL**
+- [x] **步骤 3：实现文档 ACL**
 
 无文档 ACL 时继承空间权限；存在 ACL 时必须同时满足空间至少 `VIEW`，且当前用户、部门或任一用户组在允许列表。文档 ACL 永远不能给没有空间 `VIEW` 的主体扩权。
 
-- [ ] **步骤 4：覆盖所有在线入口**
+- [x] **步骤 4：覆盖所有在线入口**
 
 空间读取、搜索参数解析、引用、预览和下载共用 `AuthorizationService`，禁止 controller 自行拼 ACL。Phase 1 尚未实现真实检索和对象下载时，提供受保护的 authorization probe e2e 路径，只用于测试且生产禁用。
 
-- [ ] **步骤 5：验证零越权并提交**
+- [x] **步骤 5：验证零越权并提交**
 
 运行：
 

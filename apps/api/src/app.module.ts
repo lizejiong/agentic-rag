@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 
 import { AuthModule } from './auth/auth.module';
+import { AuthorizationModule } from './authorization/authorization.module';
 import { ChatModule } from './chat/chat.module';
 import { HealthController } from './health/health.controller';
 import { ConfigurationModule } from './infrastructure/config/configuration.module';
@@ -15,6 +16,7 @@ import { UsersModule } from './users/users.module';
     ConfigurationModule,
     DatabaseModule,
     AuthModule,
+    AuthorizationModule,
     UsersModule,
     OrganizationModule,
     SpacesModule,
