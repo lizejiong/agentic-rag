@@ -622,15 +622,15 @@ git commit -m "feat: bridge postgres outbox to redis streams"
 - 修改：`apps/web/src/App.tsx`
 - 修改：`apps/web/src/features/chat/chat-transport.ts`
 
-- [ ] **步骤 1：实现内存 access token 与 cookie refresh**
+- [x] **步骤 1：实现内存 access token 与 cookie refresh**
 
 Access token 只保存在 React memory；页面加载调用 `/auth/refresh` 恢复会话，refresh token 仅由 HttpOnly cookie 携带。401 时最多自动刷新一次，不形成重试循环。
 
-- [ ] **步骤 2：实现最小登录和空间选择**
+- [x] **步骤 2：实现最小登录和空间选择**
 
 登录页包含用户名、密码和可关联 request ID 的错误提示。登录后显示用户可见空间；聊天发送时必须至少选择一个空间。
 
-- [ ] **步骤 3：让聊天 Transport 附加真实身份**
+- [x] **步骤 3：让聊天 Transport 附加真实身份**
 
 `createChatTransport` 从 auth provider 获取 access token，并发送：
 
@@ -644,7 +644,7 @@ headers: {
 
 请求体的 `selectedSpaceIds` 来自当前选择，不再固定为空数组。
 
-- [ ] **步骤 4：验证并提交**
+- [x] **步骤 4：验证并提交**
 
 运行：
 
