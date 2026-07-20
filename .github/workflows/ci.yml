@@ -101,7 +101,8 @@ jobs:
       - name: Start complete local data platform
         run: |
           cp infra/compose/.env.example infra/compose/.env
-          docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml up -d --wait --wait-timeout 240
+          docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml up -d --wait --wait-timeout 240 postgres elasticsearch neo4j redis minio
+          docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml run --rm minio-init
 
       - name: Verify all infrastructure health checks
         run: node scripts/check-infrastructure.mjs

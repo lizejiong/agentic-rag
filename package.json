@@ -16,7 +16,7 @@
     "infra:check": "node scripts/check-infrastructure.mjs",
     "db:migrate:app": "pnpm --filter @rag/api exec prisma migrate deploy",
     "db:migrate:rag": "uv run --project services/ai alembic -c services/ai/alembic.ini upgrade head",
-    "db:seed": "pnpm --filter @rag/api exec prisma db seed",
+    "db:seed": "pnpm prepare:generated && pnpm --filter @rag/api exec prisma db seed",
     "prepare:contracts": "pnpm --filter @rag/contracts build",
     "prepare:generated": "pnpm prepare:contracts && pnpm --filter @rag/api prisma:generate",
     "lint": "pnpm prepare:generated && pnpm -r --if-present lint && uv run --project services/ai ruff check services/ai",
