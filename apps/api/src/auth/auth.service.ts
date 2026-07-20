@@ -24,12 +24,39 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { username: username.trim().toLowerCase() },
     });
+    const now = new Date();
+    const isLocked = Boolean(user?.lockedUntil && user.lockedUntil > now);
     if (
       !user ||
       user.status !== 'ACTIVE' ||
+      isLocked ||
       !(await this.passwords.verify(user.passwordHash, password))
     ) {
+      if (user && user.status === 'ACTIVE' && !isLocked) {
+        await this.prisma.$executeRaw`
+          UPDATE "app"."users"
+          SET
+            "failed_login_count" = CASE
+              WHEN "locked_until" IS NOT NULL AND "locked_until" <= NOW() THEN 1
+              ELSE "failed_login_count" + 1
+            END,
+            "locked_until" = CASE
+              WHEN "locked_until" IS NOT NULL AND "locked_until" <= NOW() THEN NULL
+              WHEN "failed_login_count" + 1 >= 5
+              THEN NOW() + INTERVAL '15 minutes'
+              ELSE "locked_until"
+            END
+          WHERE "id" = ${user.id}::uuid
+        `;
+      }
       throw new UnauthorizedException('INVALID_CREDENTIALS');
+    }
+
+    if (user.failedLoginCount > 0 || user.lockedUntil) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginCount: 0, lockedUntil: null },
+      });
     }
 
     const subject: AuthenticatedUser = {
@@ -38,7 +65,12 @@ export class AuthService {
       role: user.role,
       tokenVersion: user.tokenVersion,
     };
-    const accessToken = await this.jwt.signAsync(
+    const accessToken = await this.issueAccessToken(subject);
+    return { accessToken, user: subject };
+  }
+
+  issueAccessToken(subject: AuthenticatedUser): Promise<string> {
+    return this.jwt.signAsync(
       {
         username: subject.username,
         role: subject.role,
@@ -51,6 +83,5 @@ export class AuthService {
         expiresIn: '15m',
       },
     );
-    return { accessToken, user: subject };
   }
 }

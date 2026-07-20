@@ -381,23 +381,23 @@ git commit -m "feat: add local account authentication"
 - 修改：`apps/api/src/auth/auth.controller.ts`
 - 修改：`apps/api/src/auth/auth.service.ts`
 
-- [ ] **步骤 1：安装 Redis 客户端**
+- [x] **步骤 1：安装 Redis 客户端**
 
 运行：`pnpm --filter @rag/api add redis`
 
-- [ ] **步骤 2：实现 refresh token family**
+- [x] **步骤 2：实现 refresh token family**
 
 Refresh token 使用 32 字节随机值，浏览器只接收 `HttpOnly`、`Secure`（生产）、`SameSite=Strict` cookie；数据库只保存 SHA-256 hash。每次刷新在事务中撤销旧 token 并创建同 family 新 token；已撤销 token 被再次使用时撤销整个 family。
 
-- [ ] **步骤 3：实现登录限流和账号冷却**
+- [x] **步骤 3：实现登录限流和账号冷却**
 
 Redis 限制同一 IP + username 在 5 分钟内最多 10 次；数据库在连续 5 次失败后把账号锁定 15 分钟。Redis 不可用时认证返回可重试的 503，不绕过限制。
 
-- [ ] **步骤 4：实现幂等退出**
+- [x] **步骤 4：实现幂等退出**
 
 `POST /auth/logout` 撤销当前 refresh session、清 cookie；重复调用仍返回 204。`POST /auth/logout-all` 递增 `tokenVersion` 并撤销用户全部 refresh session。
 
-- [ ] **步骤 5：验证并提交**
+- [x] **步骤 5：验证并提交**
 
 运行：
 

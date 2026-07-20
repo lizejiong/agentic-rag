@@ -52,27 +52,48 @@ export class UsersService {
   }
 
   async setStatus(id: string, status: 'ACTIVE' | 'DISABLED') {
-    const result = await this.prisma.user.updateMany({
-      where: { id },
-      data: { status, tokenVersion: { increment: 1 } },
+    const updated = await this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.user.updateMany({
+        where: { id },
+        data: { status, tokenVersion: { increment: 1 } },
+      });
+      if (result.count === 0) {
+        return false;
+      }
+      await transaction.refreshSession.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return true;
     });
-    if (result.count === 0) {
+    if (!updated) {
       throw new NotFoundException('USER_NOT_FOUND');
     }
     return { status };
   }
 
   async resetPassword(id: string, password: string): Promise<void> {
-    const result = await this.prisma.user.updateMany({
-      where: { id },
-      data: {
-        passwordHash: await this.passwords.hash(password),
-        tokenVersion: { increment: 1 },
-        failedLoginCount: 0,
-        lockedUntil: null,
-      },
+    const passwordHash = await this.passwords.hash(password);
+    const updated = await this.prisma.$transaction(async (transaction) => {
+      const result = await transaction.user.updateMany({
+        where: { id },
+        data: {
+          passwordHash,
+          tokenVersion: { increment: 1 },
+          failedLoginCount: 0,
+          lockedUntil: null,
+        },
+      });
+      if (result.count === 0) {
+        return false;
+      }
+      await transaction.refreshSession.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return true;
     });
-    if (result.count === 0) {
+    if (!updated) {
       throw new NotFoundException('USER_NOT_FOUND');
     }
   }

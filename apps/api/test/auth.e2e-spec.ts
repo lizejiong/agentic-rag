@@ -1,4 +1,5 @@
 import type { Server } from 'node:http';
+import { randomUUID } from 'node:crypto';
 
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -86,7 +87,31 @@ describe('Local account authentication', () => {
       .expect(201);
     const member = createdUserSchema.parse(createResponse.body as unknown);
 
-    const memberLoginResponse = await request(app.getHttpServer() as Server)
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await request(app.getHttpServer() as Server)
+        .post('/auth/login')
+        .send({ username: MEMBER_USERNAME, password: 'wrong-password' })
+        .expect(401);
+    }
+    await request(app.getHttpServer() as Server)
+      .post('/auth/login')
+      .send({ username: MEMBER_USERNAME, password: MEMBER_PASSWORD })
+      .expect(401);
+    const lockedMember = await prisma.user.findUniqueOrThrow({
+      where: { id: member.id },
+      select: { lockedUntil: true, failedLoginCount: true },
+    });
+    expect(lockedMember.failedLoginCount).toBe(5);
+    expect(lockedMember.lockedUntil).toBeInstanceOf(Date);
+
+    await request(app.getHttpServer() as Server)
+      .post(`/users/${member.id}/reset-password`)
+      .set('authorization', `Bearer ${adminLogin.accessToken}`)
+      .send({ password: MEMBER_PASSWORD })
+      .expect(201);
+
+    const memberAgent = request.agent(app.getHttpServer() as Server);
+    const memberLoginResponse = await memberAgent
       .post('/auth/login')
       .send({ username: MEMBER_USERNAME, password: MEMBER_PASSWORD })
       .expect(201);
@@ -133,14 +158,89 @@ describe('Local account authentication', () => {
       .send({ password: NEW_MEMBER_PASSWORD })
       .expect(201);
 
+    await memberAgent.post('/auth/refresh').expect(401);
+
     await request(app.getHttpServer() as Server)
       .get('/auth/me')
       .set('authorization', `Bearer ${memberLogin.accessToken}`)
       .expect(401);
 
-    await request(app.getHttpServer() as Server)
+    await memberAgent
       .post('/auth/login')
       .send({ username: MEMBER_USERNAME, password: NEW_MEMBER_PASSWORD })
       .expect(201);
+
+    const sessionLoginResponse = await memberAgent
+      .post('/auth/login')
+      .send({ username: MEMBER_USERNAME, password: NEW_MEMBER_PASSWORD })
+      .expect(201);
+    const sessionLogin = loginResponseSchema.parse(sessionLoginResponse.body as unknown);
+    const setCookie = z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .parse(sessionLoginResponse.headers['set-cookie']);
+    const originalRefreshCookie = Array.isArray(setCookie)
+      ? setCookie[0]?.split(';', 1)[0]
+      : setCookie?.split(';', 1)[0];
+    expect(originalRefreshCookie).toBeTruthy();
+    const serializedCookies = Array.isArray(setCookie) ? setCookie.join('; ') : (setCookie ?? '');
+    expect(serializedCookies).toContain('HttpOnly');
+    expect(serializedCookies).toContain('SameSite=Strict');
+    expect(serializedCookies).toContain('Path=/auth');
+    const storedSession = await prisma.refreshSession.findFirstOrThrow({
+      where: { userId: member.id, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: { tokenHash: true },
+    });
+    expect(storedSession.tokenHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(originalRefreshCookie).not.toContain(storedSession.tokenHash);
+
+    const concurrentRefreshes = await Promise.all([
+      request(app.getHttpServer() as Server)
+        .post('/auth/refresh')
+        .set('cookie', originalRefreshCookie ?? ''),
+      request(app.getHttpServer() as Server)
+        .post('/auth/refresh')
+        .set('cookie', originalRefreshCookie ?? ''),
+    ]);
+    expect(concurrentRefreshes.map((response) => response.status).sort()).toEqual([201, 401]);
+    const successfulRefresh = concurrentRefreshes.find((response) => response.status === 201);
+    const refreshed = loginResponseSchema.parse(successfulRefresh?.body as unknown);
+    expect(refreshed.accessToken).not.toBe(sessionLogin.accessToken);
+    await memberAgent.post('/auth/refresh').expect(401);
+
+    const logoutAllLoginResponse = await memberAgent
+      .post('/auth/login')
+      .send({ username: MEMBER_USERNAME, password: NEW_MEMBER_PASSWORD })
+      .expect(201);
+    const logoutAllLogin = loginResponseSchema.parse(logoutAllLoginResponse.body as unknown);
+    await memberAgent
+      .post('/auth/logout-all')
+      .set('authorization', `Bearer ${logoutAllLogin.accessToken}`)
+      .expect(204);
+    await request(app.getHttpServer() as Server)
+      .get('/auth/me')
+      .set('authorization', `Bearer ${logoutAllLogin.accessToken}`)
+      .expect(401);
+    await memberAgent.post('/auth/refresh').expect(401);
+
+    await memberAgent
+      .post('/auth/login')
+      .send({ username: MEMBER_USERNAME, password: NEW_MEMBER_PASSWORD })
+      .expect(201);
+    await memberAgent.post('/auth/logout').expect(204);
+    await memberAgent.post('/auth/logout').expect(204);
+
+    const unknownUsername = `missing-${randomUUID()}`;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await request(app.getHttpServer() as Server)
+        .post('/auth/login')
+        .send({ username: unknownUsername, password: 'wrong-password' })
+        .expect(401);
+    }
+    await request(app.getHttpServer() as Server)
+      .post('/auth/login')
+      .send({ username: unknownUsername, password: 'wrong-password' })
+      .expect(429);
   });
 });

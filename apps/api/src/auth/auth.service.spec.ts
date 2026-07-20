@@ -27,6 +27,7 @@ const activeUser = {
 
 describe('AuthService', () => {
   const findUnique = jest.fn();
+  const executeRaw = jest.fn().mockResolvedValue(1);
   const verify = jest.fn();
   let signedPayload: Record<string, unknown> | undefined;
   const signAsync = jest.fn(
@@ -37,7 +38,7 @@ describe('AuthService', () => {
     },
   );
   const service = new AuthService(
-    { user: { findUnique } } as unknown as PrismaService,
+    { user: { findUnique }, $executeRaw: executeRaw } as unknown as PrismaService,
     { verify } as unknown as PasswordService,
     { signAsync } as unknown as JwtService,
     environment,
