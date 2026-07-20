@@ -1,15 +1,28 @@
 import { request as httpRequest, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-import type { INestApplication } from '@nestjs/common';
+import type { ExecutionContext, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { AgentEvent, RunRequest } from '@rag/contracts';
 import request from 'supertest';
 
 import { AI_EVENT_SOURCE, type AiEventSource } from '../src/ai/ai-event-source';
 import { AppModule } from '../src/app.module';
+import { AccessTokenGuard } from '../src/auth/access-token.guard';
+import type { AuthenticatedRequest } from '../src/auth/current-user.decorator';
 
 const REQUEST_ID = '00000000-0000-4000-8000-000000000030';
+const testAuthGuard = {
+  canActivate(context: ExecutionContext): boolean {
+    context.switchToHttp().getRequest<AuthenticatedRequest>().user = {
+      id: '00000000-0000-4000-8000-000000000001',
+      username: 'tester',
+      role: 'MEMBER',
+      tokenVersion: 0,
+    };
+    return true;
+  },
+};
 
 function payload(requestId = REQUEST_ID) {
   return {
@@ -104,6 +117,8 @@ describe('Chat cancellation boundaries', () => {
     })
       .overrideProvider(AI_EVENT_SOURCE)
       .useValue(fake)
+      .overrideGuard(AccessTokenGuard)
+      .useValue(testAuthGuard)
       .compile();
     app = module.createNestApplication();
     await app.listen(0, '127.0.0.1');

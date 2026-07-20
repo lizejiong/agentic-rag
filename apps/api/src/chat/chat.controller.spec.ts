@@ -1,15 +1,29 @@
 import type { Server } from 'node:http';
 
-import type { INestApplication } from '@nestjs/common';
+import { ForbiddenException, type ExecutionContext, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { AgentEvent, RunRequest } from '@rag/contracts';
 import request from 'supertest';
 
 import { AI_EVENT_SOURCE, type AiEventSource } from '../ai/ai-event-source';
+import { AccessTokenGuard } from '../auth/access-token.guard';
+import type { AuthenticatedRequest } from '../auth/current-user.decorator';
+import { AuthorizationService } from '../authorization/authorization.service';
 import { ActiveRunRegistry } from './active-run.registry';
 import { ChatController } from './chat.controller';
 
 const REQUEST_ID = '00000000-0000-4000-8000-000000000010';
+const testAuthGuard = {
+  canActivate(context: ExecutionContext): boolean {
+    context.switchToHttp().getRequest<AuthenticatedRequest>().user = {
+      id: '00000000-0000-4000-8000-000000000001',
+      username: 'tester',
+      role: 'MEMBER',
+      tokenVersion: 0,
+    };
+    return true;
+  },
+};
 
 class FakeAiEventSource implements AiEventSource {
   lastRequest: RunRequest | undefined;
@@ -49,13 +63,27 @@ class FakeAiEventSource implements AiEventSource {
 describe('ChatController', () => {
   let app: INestApplication;
   let fake: FakeAiEventSource;
+  let activeRuns: ActiveRunRegistry;
+  let requireSpace: jest.Mock;
 
   beforeEach(async () => {
     fake = new FakeAiEventSource();
+    requireSpace = jest.fn().mockResolvedValue('VIEW');
     const module = await Test.createTestingModule({
       controllers: [ChatController],
-      providers: [ActiveRunRegistry, { provide: AI_EVENT_SOURCE, useValue: fake }],
-    }).compile();
+      providers: [
+        ActiveRunRegistry,
+        { provide: AI_EVENT_SOURCE, useValue: fake },
+        {
+          provide: AuthorizationService,
+          useValue: { requireSpace },
+        },
+      ],
+    })
+      .overrideGuard(AccessTokenGuard)
+      .useValue(testAuthGuard)
+      .compile();
+    activeRuns = module.get(ActiveRunRegistry);
     app = module.createNestApplication();
     await app.init();
   });
@@ -115,7 +143,32 @@ describe('ChatController', () => {
     expect(fake.lastRequest).toBeUndefined();
   });
 
+  it('rejects a selected space before starting AI when the user lacks VIEW', async () => {
+    requireSpace.mockRejectedValue(new ForbiddenException('SPACE_PERMISSION_DENIED'));
+
+    await request(app.getHttpServer() as Server)
+      .post('/chat/stream')
+      .set('x-chat-protocol-version', '1')
+      .send({
+        id: 'message-root',
+        requestId: REQUEST_ID,
+        selectedSpaceIds: ['00000000-0000-4000-8000-000000000099'],
+        messages: [
+          {
+            id: 'user-1',
+            role: 'user',
+            parts: [{ type: 'text', text: '问题' }],
+          },
+        ],
+      })
+      .expect(403);
+
+    expect(fake.lastRequest).toBeUndefined();
+  });
+
   it('forwards explicit cancellation', async () => {
+    activeRuns.start(REQUEST_ID, '00000000-0000-4000-8000-000000000001');
+
     await request(app.getHttpServer() as Server)
       .post(`/chat/${REQUEST_ID}/cancel`)
       .expect(201)

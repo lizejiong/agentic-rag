@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useChat } from '@ai-sdk/react';
 import type { RagUIMessage } from '@rag/contracts';
+import { z } from 'zod';
 
+import { useAuth } from '../auth/auth-provider';
+import { SpacePicker, type VisibleSpace } from '../spaces/space-picker';
 import { createChatTransport } from './chat-transport';
 import { MessagePart } from './message-part';
 
@@ -14,8 +17,32 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: '已停止生成',
 };
 
+const visibleSpacesSchema = z.array(
+  z.object({
+    id: z.uuid(),
+    name: z.string(),
+    description: z.string().nullable(),
+    effectivePermission: z.enum(['VIEW', 'EDIT', 'MANAGE']),
+  }),
+);
+
 export function ChatPage() {
-  const transport = useMemo(() => createChatTransport(), []);
+  const auth = useAuth();
+  const [spaces, setSpaces] = useState<VisibleSpace[]>([]);
+  const [spacesLoading, setSpacesLoading] = useState(true);
+  const [spaceError, setSpaceError] = useState<string>();
+  const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([]);
+  const selectedSpaceIdsRef = useRef<string[]>([]);
+  selectedSpaceIdsRef.current = selectedSpaceIds;
+  const transport = useMemo(
+    () =>
+      createChatTransport({
+        getAccessToken: auth.getAccessToken,
+        getSelectedSpaceIds: () => selectedSpaceIdsRef.current,
+        authorizedFetch: auth.authorizedFetch,
+      }),
+    [auth.authorizedFetch, auth.getAccessToken],
+  );
   const [input, setInput] = useState('');
   const [agentStatus, setAgentStatus] = useState<string>();
   const { messages, sendMessage, status, stop, error } = useChat<RagUIMessage>({
@@ -27,6 +54,47 @@ export function ChatPage() {
     },
   });
   const busy = status === 'submitted' || status === 'streaming';
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    setSpacesLoading(true);
+    void auth
+      .authorizedFetch('/api/spaces', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`SPACE_LIST_${response.status}`);
+        }
+        const visible = visibleSpacesSchema.parse(await response.json());
+        if (!active) {
+          return;
+        }
+        setSpaces(visible);
+        setSelectedSpaceIds((current) => {
+          const stillVisible = current.filter((id) => visible.some((space) => space.id === id));
+          return stillVisible.length > 0
+            ? stillVisible
+            : visible[0]
+              ? [visible[0].id]
+              : [];
+        });
+        setSpaceError(undefined);
+      })
+      .catch((caught: unknown) => {
+        if (active && !(caught instanceof DOMException && caught.name === 'AbortError')) {
+          setSpaceError('知识空间加载失败，请重新登录后重试');
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setSpacesLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [auth.authorizedFetch]);
 
   return (
     <div className="app-shell">
@@ -40,13 +108,21 @@ export function ChatPage() {
             <small>企业知识智能</small>
           </span>
         </a>
-        <div className="system-state">
-          <span aria-hidden="true" />
-          服务就绪
+        <div className="account-state">
+          <span>{auth.user?.username}</span>
+          <button type="button" onClick={() => void auth.logout()}>
+            退出
+          </button>
         </div>
       </header>
 
       <main className="chat-layout">
+        <SpacePicker
+          spaces={spaces}
+          selectedIds={selectedSpaceIds}
+          onChange={setSelectedSpaceIds}
+          loading={spacesLoading}
+        />
         <section className="conversation" aria-label="知识问答对话">
           <div className="conversation-heading">
             <div>
@@ -104,12 +180,18 @@ export function ChatPage() {
                   : '可以开始提问'}
             </div>
             {error ? <p role="alert">{error.message}</p> : null}
+            {spaceError ? <p role="alert">{spaceError}</p> : null}
+            {!spacesLoading && selectedSpaceIds.length === 0 ? (
+              <p className="space-required" role="status">
+                请至少选择一个知识空间后再提问
+              </p>
+            ) : null}
             <form
               className="composer"
               onSubmit={(event) => {
                 event.preventDefault();
                 const text = input.trim();
-                if (!text || busy) {
+                if (!text || busy || selectedSpaceIds.length === 0) {
                   return;
                 }
                 setAgentStatus(undefined);
@@ -151,7 +233,7 @@ export function ChatPage() {
                   <button
                     type="submit"
                     className="send-button"
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || selectedSpaceIds.length === 0}
                   >
                     发送
                     <span aria-hidden="true">↗</span>

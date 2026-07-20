@@ -16,6 +16,9 @@ import type { Request, Response } from 'express';
 
 import { AI_EVENT_SOURCE, type AiEventSource } from '../ai/ai-event-source';
 import { AiStreamMapper } from '../ai/ai-stream.mapper';
+import { AccessTokenGuard } from '../auth/access-token.guard';
+import type { AuthenticatedRequest } from '../auth/current-user.decorator';
+import { AuthorizationService } from '../authorization/authorization.service';
 import { ActiveRunRegistry } from './active-run.registry';
 import { ChatProtocolGuard } from './chat-protocol.guard';
 import { chatRequestSchema, type ChatRequest } from './chat.request';
@@ -46,11 +49,12 @@ export class ChatController {
   constructor(
     @Inject(AI_EVENT_SOURCE) private readonly ai: AiEventSource,
     private readonly activeRuns: ActiveRunRegistry,
+    private readonly authorization: AuthorizationService,
   ) {}
 
   @Post('stream')
-  @UseGuards(ChatProtocolGuard)
-  async stream(@Req() req: Request, @Res() res: Response): Promise<void> {
+  @UseGuards(AccessTokenGuard, ChatProtocolGuard)
+  async stream(@Req() req: AuthenticatedRequest, @Res() res: Response): Promise<void> {
     const parsed = chatRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new BadRequestException('INVALID_CHAT_REQUEST');
@@ -62,7 +66,12 @@ export class ChatController {
     }
 
     const requestId = parsed.data.requestId;
-    const abort = this.activeRuns.start(requestId);
+    await Promise.all(
+      parsed.data.selectedSpaceIds.map((spaceId) =>
+        this.authorization.requireSpace(req.user, spaceId, 'VIEW'),
+      ),
+    );
+    const abort = this.activeRuns.start(requestId, req.user.id);
     req.once('aborted', () => abort.abort());
     res.once('close', () => {
       if (!res.writableEnded) {
@@ -80,7 +89,7 @@ export class ChatController {
               {
                 requestId,
                 traceId: req.header('x-trace-id')?.trim() || randomUUID(),
-                actorId: 'foundation-user',
+                actorId: req.user.id,
                 question,
                 selectedSpaceIds: parsed.data.selectedSpaceIds,
               },
@@ -107,11 +116,14 @@ export class ChatController {
   }
 
   @Post(':requestId/cancel')
+  @UseGuards(AccessTokenGuard)
   async cancel(
+    @Req() request: AuthenticatedRequest,
     @Param('requestId', new ParseUUIDPipe()) requestId: string,
   ): Promise<{ status: 'cancelling' }> {
-    this.activeRuns.abort(requestId);
-    await this.ai.cancel(requestId);
+    if (this.activeRuns.abort(requestId, request.user.id)) {
+      await this.ai.cancel(requestId);
+    }
     return { status: 'cancelling' };
   }
 }

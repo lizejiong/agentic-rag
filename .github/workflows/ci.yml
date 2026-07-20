@@ -12,6 +12,38 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://atlas:ci-postgres@127.0.0.1:5432/atlas_rag
+      RAG_DATABASE_URL: postgresql://atlas:ci-postgres@127.0.0.1:5432/atlas_rag
+      REDIS_URL: redis://127.0.0.1:6379
+      AI_SERVICE_URL: http://127.0.0.1:8001
+      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
+      JWT_REFRESH_PEPPER: ci-refresh-pepper-with-at-least-32-characters
+      COOKIE_SECURE: "false"
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.5-pg17
+        env:
+          POSTGRES_DB: atlas_rag
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: ci-postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atlas -d atlas_rag"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:8.4.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +67,12 @@ jobs:
       - name: Install Python dependencies
         run: uv sync --project services/ai --frozen
 
+      - name: Apply application and RAG migrations
+        run: |
+          pnpm db:migrate:app
+          pnpm db:migrate:rag
+          pnpm db:seed
+
       - name: Check workspace
         run: pnpm check:workspace
 
@@ -49,3 +87,26 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  infrastructure-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+
+      - name: Start complete local data platform
+        run: |
+          cp infra/compose/.env.example infra/compose/.env
+          docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml up -d --wait --wait-timeout 240 postgres elasticsearch neo4j redis minio
+          docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml run --rm minio-init
+
+      - name: Verify all infrastructure health checks
+        run: node scripts/check-infrastructure.mjs
+
+      - name: Stop data platform
+        if: always()
+        run: docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml down -v
