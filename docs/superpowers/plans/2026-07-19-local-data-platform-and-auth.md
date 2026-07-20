@@ -724,4 +724,4 @@ git commit -m "docs: add phase one operations and acceptance"
 - [x] `app` 与 `rag` schema 迁移归属互不越界。
 - [x] Compose 从空卷启动后全部健康。
 - [x] React 和聊天链路使用真实认证主体，不再存在 `foundation-user`。
-- [ ] 全量 lint、typecheck、test、build、smoke 与 CI 通过。
+- [x] 全量 lint、typecheck、test、build、smoke 与 CI 通过。
