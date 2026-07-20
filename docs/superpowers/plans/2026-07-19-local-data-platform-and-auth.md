@@ -668,15 +668,15 @@ git commit -m "feat: add authenticated knowledge workspace"
 - 修改：`docs/development/quickstart.md`
 - 修改：`README.md`
 
-- [ ] **步骤 1：建立真实链路 smoke**
+- [x] **步骤 1：建立真实链路 smoke**
 
 `smoke-auth.mjs` 完成：管理员登录 → 创建成员 → 创建空间 → 给成员 `VIEW` → 成员登录 → 获取空间 → 发起带真实 user ID 的聊天 → 撤权 → 同一成员再次访问被拒绝。
 
-- [ ] **步骤 2：建立 CI 服务容器**
+- [x] **步骤 2：建立 CI 服务容器**
 
 CI 使用 PostgreSQL/pgvector 和 Redis service 跑迁移与核心授权集成测试；Elasticsearch、Neo4j、MinIO 的完整健康检查放入独立 Compose smoke job，避免每个单元测试 job 重复拉取大镜像。
 
-- [ ] **步骤 3：运行全量门禁**
+- [x] **步骤 3：运行全量门禁**
 
 运行：
 
@@ -700,7 +700,7 @@ pnpm smoke:auth
 - 重复 Outbox event 不产生重复副作用。
 - 聊天链路不存在 `foundation-user`。
 
-- [ ] **步骤 4：更新文档并提交**
+- [x] **步骤 4：更新文档并提交**
 
 Quickstart 必须包含 `.env` 初始化、Compose、Prisma migration、Alembic migration、管理员引导、三个开发进程和 smoke 命令。
 
@@ -711,17 +711,17 @@ git commit -m "docs: add phase one operations and acceptance"
 
 ## Phase 1 完成检查
 
-- [ ] 只有 `ADMIN`、`MEMBER` 两种系统角色。
-- [ ] 空间权限只有 `VIEW`、`EDIT`、`MANAGE` 三个递进等级，不扩展为更多角色。
-- [ ] 密码仅保存 Argon2id hash，refresh token 仅保存 hash。
-- [ ] 禁用、重置、退出和 refresh reuse 都能撤销既有会话。
-- [ ] ACL 解析覆盖直接用户、部门和用户组，文档 ACL 只能收紧。
-- [ ] 空间、文档、引用、预览和下载越权成功数为 0。
-- [ ] 授权变更递增 revision，旧缓存立即不再命中。
-- [ ] 业务变更、审计和 Outbox 在同一 PostgreSQL 事务。
-- [ ] Redis Streams 重复投递幂等，失败可重试并进入死信流。
-- [ ] PostgreSQL 是永久状态真相源，Redis 清空不丢业务。
-- [ ] `app` 与 `rag` schema 迁移归属互不越界。
-- [ ] Compose 从空卷启动后全部健康。
-- [ ] React 和聊天链路使用真实认证主体，不再存在 `foundation-user`。
+- [x] 只有 `ADMIN`、`MEMBER` 两种系统角色。
+- [x] 空间权限只有 `VIEW`、`EDIT`、`MANAGE` 三个递进等级，不扩展为更多角色。
+- [x] 密码仅保存 Argon2id hash，refresh token 仅保存 hash。
+- [x] 禁用、重置、退出和 refresh reuse 都能撤销既有会话。
+- [x] ACL 解析覆盖直接用户、部门和用户组，文档 ACL 只能收紧。
+- [x] 空间、文档、引用、预览和下载越权成功数为 0。
+- [x] 授权变更递增 revision，旧缓存立即不再命中。
+- [x] 业务变更、审计和 Outbox 在同一 PostgreSQL 事务。
+- [x] Redis Streams 重复投递幂等，失败可重试并进入死信流。
+- [x] PostgreSQL 是永久状态真相源，Redis 清空不丢业务。
+- [x] `app` 与 `rag` schema 迁移归属互不越界。
+- [x] Compose 从空卷启动后全部健康。
+- [x] React 和聊天链路使用真实认证主体，不再存在 `foundation-user`。
 - [ ] 全量 lint、typecheck、test、build、smoke 与 CI 通过。

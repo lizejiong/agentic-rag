@@ -66,7 +66,10 @@ export function loadWorkspaceEnvironment(): void {
 
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
-      Object.assign(process.env, parseEnv(readFileSync(candidate, 'utf8')));
+      const fileEnvironment = parseEnv(readFileSync(candidate, 'utf8'));
+      for (const [key, value] of Object.entries(fileEnvironment)) {
+        process.env[key] ??= value;
+      }
       return;
     }
   }
