@@ -1,9 +1,4 @@
-export type VisibleSpace = {
-  id: string;
-  name: string;
-  description: string | null;
-  effectivePermission: 'VIEW' | 'EDIT' | 'MANAGE';
-};
+import type { VisibleSpace } from './space-contract';
 
 export function SpacePicker({
   spaces,

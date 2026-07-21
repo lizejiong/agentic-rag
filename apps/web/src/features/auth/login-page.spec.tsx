@@ -1,11 +1,33 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from '../../App';
+import { queryClient } from '../../app/query-client';
 
 describe('LoginPage', () => {
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('redirects an anonymous visitor from chat to login', async () => {
+    window.history.replaceState({}, '', '/chat');
+    queryClient.setQueryData(['spaces', 'visible'], [{ id: 'previous-user-space' }]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ message: 'REFRESH_TOKEN_REQUIRED' }, { status: 401 }),
+      ),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: '登录知识工作台' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/login');
+    await waitFor(() => {
+      expect(queryClient.getQueryData(['spaces', 'visible'])).toBeUndefined();
+    });
   });
 
   it('shows a request identifier when login fails', async () => {
