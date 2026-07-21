@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react';
 
-import { ApiError } from './auth-client';
+import { ApiError } from '../../shared/api/api-error';
 import { useAuth } from './auth-provider';
 
 export function LoginPage() {
