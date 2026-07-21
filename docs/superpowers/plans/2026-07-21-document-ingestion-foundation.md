@@ -1,6 +1,6 @@
 # Phase 2 文档导入核心闭环实施计划
 
-> 状态：待执行  
+> 状态：执行中
 > 分支：`codex/phase2-document-ingestion`  
 > 范围：把文件从浏览器可靠地送入隔离存储，经异步 Worker 安全检查、解析、规范化和结构化分块，再将结果发布为可用文档并在前端展示进度。
 
@@ -9,7 +9,7 @@
 - [x] 任务 1：共享合同与 Prisma 业务模型
 - [x] 任务 2：MinIO 隔离存储与配置
 - [x] 任务 3：文档导入 API 与事务 Outbox
-- [ ] 任务 4：Python Worker 持久事件骨架
+- [x] 任务 4：Python Worker 持久事件骨架
 - [ ] 任务 5：安全门、规范化模型与结构化分块
 - [ ] 任务 6：结果消费、原子发布与恢复
 - [ ] 任务 7：React 文档与导入体验
@@ -202,7 +202,7 @@ pnpm.cmd --filter @rag/api build
 
 **实现**
 
-1. 增加 Redis、MinIO、SQLAlchemy async、Docling 和安全解析依赖；Web API 与 Worker 使用不同启动命令。
+1. 增加 Redis、MinIO 和 SQLAlchemy async 依赖；Web API 与 Worker 使用不同启动命令。Docling 与安全解析依赖在任务 5 随实际适配器一并加入。
 2. 在 `rag` schema 新增 `ingestion_runs`、`normalized_documents`、`normalized_elements`、`chunks`、`worker_outbox`、`processed_events`。
 3. Worker 使用 consumer group 消费 `atlas:events`，只处理 `document.ingestion.requested.v1`；先写 `processed_events` 并以 eventId 保证幂等。
 4. 每个阶段提交 `ingestion_runs` 状态；成功/失败/进度先写 PostgreSQL `worker_outbox`，独立 publisher 重试发布，收到 Redis ACK 后标记 published。

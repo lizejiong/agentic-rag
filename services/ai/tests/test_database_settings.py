@@ -11,6 +11,7 @@ def test_prefers_rag_specific_database_url(monkeypatch: pytest.MonkeyPatch) -> N
     settings = DatabaseSettings(_env_file=None)
 
     assert settings.sqlalchemy_url == "postgresql+psycopg://atlas:secret@localhost/rag"
+    assert settings.async_sqlalchemy_url == "postgresql+psycopg_async://atlas:secret@localhost/rag"
 
 
 def test_accepts_shared_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
