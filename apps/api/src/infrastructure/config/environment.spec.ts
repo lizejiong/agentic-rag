@@ -5,6 +5,11 @@ const validEnvironment = {
   DATABASE_URL: 'postgresql://atlas:secret@127.0.0.1:55432/atlas_rag',
   REDIS_URL: 'redis://:secret@127.0.0.1:56379',
   AI_SERVICE_URL: 'http://127.0.0.1:8001',
+  MINIO_ENDPOINT: '127.0.0.1',
+  MINIO_PORT: '9000',
+  MINIO_USE_SSL: 'false',
+  MINIO_ACCESS_KEY: 'atlas',
+  MINIO_SECRET_KEY: 'local-minio-secret',
   JWT_ACCESS_SECRET: 'access-secret-with-at-least-32-characters',
   JWT_REFRESH_PEPPER: 'refresh-pepper-with-at-least-32-characters',
   COOKIE_SECURE: 'false',
@@ -16,7 +21,18 @@ describe('parseEnvironment', () => {
       NODE_ENV: 'test',
       PORT: 3000,
       COOKIE_SECURE: false,
+      MINIO_PORT: 9000,
+      MINIO_USE_SSL: false,
     });
+  });
+
+  it('rejects an invalid object storage bucket name', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        MINIO_QUARANTINE_BUCKET: 'Invalid_Bucket',
+      }),
+    ).toThrow(/MINIO_QUARANTINE_BUCKET/);
   });
 
   it('rejects shared access and refresh secrets', () => {

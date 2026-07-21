@@ -16,6 +16,19 @@ const environmentSchema = z
     DATABASE_URL: z.string().startsWith('postgresql://'),
     REDIS_URL: z.string().startsWith('redis://'),
     AI_SERVICE_URL: z.url().default('http://127.0.0.1:8001'),
+    MINIO_ENDPOINT: z.string().trim().min(1).default('127.0.0.1'),
+    MINIO_PORT: z.coerce.number().int().min(1).max(65_535).default(9000),
+    MINIO_USE_SSL: booleanValue,
+    MINIO_ACCESS_KEY: z.string().min(3).default('atlas'),
+    MINIO_SECRET_KEY: z.string().min(8).default('change-me-minio'),
+    MINIO_QUARANTINE_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+      .default('atlas-rag-quarantine'),
+    MINIO_DOCUMENT_BUCKET: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)
+      .default('atlas-rag-documents'),
     JWT_ACCESS_SECRET: z.string().min(32),
     JWT_REFRESH_PEPPER: z.string().min(32),
     COOKIE_SECURE: booleanValue,
@@ -36,6 +49,8 @@ const environmentSchema = z
       [
         environment.DATABASE_URL,
         environment.REDIS_URL,
+        environment.MINIO_ACCESS_KEY,
+        environment.MINIO_SECRET_KEY,
         environment.JWT_ACCESS_SECRET,
         environment.JWT_REFRESH_PEPPER,
       ].some((value) => value.includes('change-me'))
