@@ -103,6 +103,35 @@ describe('DocumentImportService', () => {
     expect(transaction.documentVersion.create).toHaveBeenCalledTimes(1);
   });
 
+  it('creates a durable URL capture task and outbox event', async () => {
+    const { service, outbox } = createDependencies();
+    const result = await service.createUrlImport(user, 'space-1', {
+      url: 'https://example.com/guide',
+    });
+
+    expect(result).toEqual({
+      documentId: 'document-1',
+      versionId: 'version-1',
+      importId: 'import-1',
+      status: 'QUEUED',
+    });
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment -- Jest asymmetric matchers are intentionally untyped. */
+    expect(transaction.document.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ sourceType: 'URL', title: 'example.com' }),
+    });
+    expect(transaction.documentVersion.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        sourceUrl: 'https://example.com/guide',
+        processingStatus: 'FETCHING',
+      }),
+    });
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment */
+    expect(outbox.enqueue).toHaveBeenCalledWith(
+      transaction,
+      expect.objectContaining({ type: 'document.url.capture.requested.v1' }),
+    );
+  });
+
   it('queues ingestion and writes the command through the transactional outbox', async () => {
     const { service, prisma, storage, outbox, policy } = createDependencies();
     prisma.importTask.findUnique.mockResolvedValue({

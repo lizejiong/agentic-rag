@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { Readable } from 'node:stream';
+import { Readable } from 'node:stream';
 import { Transform } from 'node:stream';
 
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
@@ -124,6 +124,21 @@ export class ObjectStorageService implements OnModuleInit {
       await this.client.removeObject(this.quarantineBucket, objectKey).catch(() => undefined);
       throw error;
     }
+  }
+
+  putQuarantineBuffer(input: {
+    importId: string;
+    body: Buffer;
+    maxBytes: number;
+    contentType: string;
+  }): Promise<StoredUpload> {
+    return this.putQuarantineObject({
+      importId: input.importId,
+      source: Readable.from(input.body),
+      expectedBytes: input.body.length,
+      maxBytes: input.maxBytes,
+      contentType: input.contentType,
+    });
   }
 
   openQuarantineObject(objectKey: string): Promise<Readable> {

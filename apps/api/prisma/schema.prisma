@@ -65,6 +65,7 @@ enum DocumentSourceType {
 
 enum DocumentProcessingStatus {
   PENDING_UPLOAD
+  FETCHING
   QUEUED
   SECURITY_CHECK
   PARSING
@@ -251,6 +252,12 @@ model DocumentVersion {
   versionNumber      Int                      @map("version_number")
   sourceType         DocumentSourceType       @map("source_type")
   sourceUrl          String?                  @map("source_url") @db.VarChar(2048)
+  resolvedUrl        String?                  @map("resolved_url") @db.VarChar(2048)
+  canonicalUrl       String?                  @map("canonical_url") @db.VarChar(2048)
+  sourceAuthor       String?                  @map("source_author") @db.VarChar(500)
+  sourcePublishedAt  DateTime?                @map("source_published_at") @db.Timestamptz(3)
+  sourceFetchedAt    DateTime?                @map("source_fetched_at") @db.Timestamptz(3)
+  sourceCheckedAt    DateTime?                @map("source_checked_at") @db.Timestamptz(3)
   originalFileName   String                   @map("original_file_name") @db.VarChar(255)
   fileExtension      String                   @map("file_extension") @db.VarChar(16)
   declaredMimeType   String                   @map("declared_mime_type") @db.VarChar(160)
@@ -275,6 +282,7 @@ model DocumentVersion {
 
   @@unique([documentId, versionNumber])
   @@index([documentId, processingStatus])
+  @@index([sourceUrl])
   @@index([contentHash])
   @@index([storedObjectId])
   @@index([createdById])

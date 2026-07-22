@@ -16,6 +16,14 @@ const environmentSchema = z
     DATABASE_URL: z.string().startsWith('postgresql://'),
     REDIS_URL: z.string().startsWith('redis://'),
     AI_SERVICE_URL: z.url().default('http://127.0.0.1:8001'),
+    URL_CAPTURE_MAX_BYTES: z.coerce
+      .number()
+      .int()
+      .min(1024)
+      .max(20 * 1024 * 1024)
+      .default(20 * 1024 * 1024),
+    URL_CAPTURE_MAX_REDIRECTS: z.coerce.number().int().min(0).max(5).default(5),
+    URL_CAPTURE_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(30_000),
     MINIO_ENDPOINT: z.string().trim().min(1).default('127.0.0.1'),
     MINIO_PORT: z.coerce.number().int().min(1).max(65_535).default(9000),
     MINIO_USE_SSL: booleanValue,

@@ -21,7 +21,7 @@
     "prepare:generated": "pnpm prepare:contracts && pnpm --filter @rag/api prisma:generate",
     "lint": "pnpm prepare:generated && pnpm -r --if-present lint && uv run --project services/ai ruff check services/ai",
     "typecheck": "pnpm prepare:generated && pnpm -r --if-present typecheck && uv run --project services/ai mypy services/ai/src",
-    "test": "pnpm prepare:generated && pnpm -r --if-present test && pnpm --filter @rag/api test:e2e && uv run --project services/ai pytest services/ai/tests",
+    "test": "pnpm prepare:generated && pnpm --filter @rag/contracts test && pnpm --filter @rag/api test && pnpm --filter @rag/web test && pnpm --filter @rag/api test:e2e && uv run --project services/ai pytest services/ai/tests",
     "build": "pnpm prepare:generated && pnpm -r --if-present build && uv build --project services/ai",
     "smoke:chat": "node scripts/smoke-chat.mjs",
     "smoke:auth": "node --env-file-if-exists=.env scripts/smoke-auth.mjs"

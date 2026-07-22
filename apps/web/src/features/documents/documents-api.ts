@@ -4,6 +4,7 @@ import type { Fetcher } from '../../shared/api/request-json';
 import { createRequestHeaders, requestJson } from '../../shared/api/request-json';
 import {
   createFileImportsResponseSchema,
+  createUrlImportResponseSchema,
   documentListSchema,
   importTaskSchema,
   type UploadTicket,
@@ -50,6 +51,40 @@ export function createFileImports(fetcher: Fetcher, spaceId: string, files: File
     },
     fetcher,
   });
+}
+
+export function createUrlImport(fetcher: Fetcher, spaceId: string, url: string) {
+  return requestJson({
+    schema: createUrlImportResponseSchema,
+    input: `/api/spaces/${spaceId}/imports/urls`,
+    init: {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url }),
+    },
+    fetcher,
+  });
+}
+
+export function refreshUrlImport(fetcher: Fetcher, documentId: string) {
+  return requestJson({
+    schema: createUrlImportResponseSchema,
+    input: `/api/documents/${documentId}/refresh-url`,
+    init: { method: 'POST' },
+    fetcher,
+  });
+}
+
+export async function waitForImport(fetcher: Fetcher, importId: string): Promise<void> {
+  for (let attempt = 0; attempt < 480; attempt += 1) {
+    const task = await getImportTask(fetcher, importId);
+    if (task.status === 'SUCCEEDED') return;
+    if (task.status === 'FAILED' || task.status === 'CANCELLED') {
+      throw new Error(task.errorCode ?? `IMPORT_${task.status}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 750));
+  }
+  throw new Error('IMPORT_POLL_TIMEOUT');
 }
 
 export function getImportTask(fetcher: Fetcher, importId: string, signal?: AbortSignal) {

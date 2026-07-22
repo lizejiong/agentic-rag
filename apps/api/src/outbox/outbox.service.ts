@@ -22,7 +22,7 @@ export class OutboxService {
       resourceId: input.resourceId,
       resourceVersion: input.resourceVersion,
       attempt: 0,
-      traceId: this.context.get()?.traceId ?? 'system',
+      traceId: input.traceId ?? this.context.get()?.traceId ?? 'system',
       occurredAt: occurredAt.toISOString(),
       payload: input.payload,
     };

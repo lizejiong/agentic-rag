@@ -3,8 +3,10 @@ import { extname } from 'node:path';
 import { BadRequestException } from '@nestjs/common';
 import {
   createFileImportsSchema,
+  createUrlImportSchema,
   supportedDocumentExtensionSchema,
   type CreateFileImports,
+  type CreateUrlImport,
 } from '@rag/contracts';
 
 const MEBIBYTE = 1024 * 1024;
@@ -19,6 +21,19 @@ export function parseCreateFileImports(input: unknown): CreateFileImports {
     validateImportFile(file.fileName, file.sizeBytes);
   }
   return result.data;
+}
+
+export function parseCreateUrlImport(input: unknown): CreateUrlImport {
+  const result = createUrlImportSchema.safeParse(input);
+  if (!result.success) {
+    throw new BadRequestException('INVALID_URL_IMPORT_REQUEST');
+  }
+  const url = new URL(result.data.url);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+    throw new BadRequestException('INVALID_URL_IMPORT_REQUEST');
+  }
+  url.hash = '';
+  return { url: url.toString() };
 }
 
 export function validateImportFile(

@@ -11,7 +11,10 @@ import {
 import type {
   CreateFileImports,
   CreateFileImportsResponse,
+  CreateUrlImport,
+  CreateUrlImportResponse,
   DocumentIngestionRequestedPayload,
+  DocumentUrlCaptureRequestedPayload,
 } from '@rag/contracts';
 
 import { AuditContextService } from '../audit/audit-context.service';
@@ -97,6 +100,160 @@ export class DocumentImportService {
     });
 
     return { imports };
+  }
+
+  async createUrlImport(
+    user: AuthenticatedUser,
+    spaceId: string,
+    input: CreateUrlImport,
+  ): Promise<CreateUrlImportResponse> {
+    await this.requireActiveSpace(spaceId);
+    const context = this.context.get();
+    const requestId = context?.requestId ?? randomUUID();
+    const traceId = context?.traceId ?? requestId;
+    const url = new URL(input.url);
+
+    return this.prisma.$transaction(async (transaction) => {
+      const document = await transaction.document.create({
+        data: {
+          spaceId,
+          title: url.hostname,
+          sourceType: 'URL',
+          createdById: user.id,
+        },
+      });
+      const version = await transaction.documentVersion.create({
+        data: {
+          documentId: document.id,
+          versionNumber: 1,
+          sourceType: 'URL',
+          sourceUrl: url.toString(),
+          originalFileName: 'captured-page.md',
+          fileExtension: 'md',
+          declaredMimeType: 'text/markdown',
+          processingStatus: 'FETCHING',
+          createdById: user.id,
+        },
+      });
+      const importTask = await transaction.importTask.create({
+        data: {
+          documentId: document.id,
+          versionId: version.id,
+          status: 'QUEUED',
+          stage: 'FETCHING',
+          progress: 5,
+          requestId,
+          traceId,
+          createdById: user.id,
+        },
+      });
+      const payload: DocumentUrlCaptureRequestedPayload = {
+        documentId: document.id,
+        spaceId,
+        versionId: version.id,
+        importId: importTask.id,
+        sourceUrl: url.toString(),
+        actorId: user.id,
+        aclSnapshot: { spaceId, documentSubjects: [] },
+      };
+      await this.outbox.enqueue(transaction, {
+        type: 'document.url.capture.requested.v1',
+        taskId: importTask.id,
+        resourceId: version.id,
+        resourceVersion: 1,
+        traceId,
+        payload,
+      });
+      return {
+        documentId: document.id,
+        versionId: version.id,
+        importId: importTask.id,
+        status: 'QUEUED' as const,
+      };
+    });
+  }
+
+  async refreshUrl(user: AuthenticatedUser, documentId: string): Promise<CreateUrlImportResponse> {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      include: {
+        versions: { orderBy: { versionNumber: 'desc' }, take: 1 },
+        aclEntries: { select: { subjectType: true, subjectId: true } },
+        importTasks: {
+          where: { status: { in: ['PENDING_UPLOAD', 'QUEUED', 'RUNNING'] } },
+          take: 1,
+        },
+      },
+    });
+    if (!document || document.availability === 'SOFT_DELETED') {
+      throw new NotFoundException('DOCUMENT_NOT_FOUND');
+    }
+    await this.spacePolicy.require(user, document.spaceId, 'EDIT');
+    const latest = document.versions[0];
+    if (document.sourceType !== 'URL' || !latest?.sourceUrl) {
+      throw new ConflictException('DOCUMENT_IS_NOT_URL');
+    }
+    const sourceUrl = latest.sourceUrl;
+    if (document.importTasks.length > 0) {
+      throw new ConflictException('URL_REFRESH_IN_PROGRESS');
+    }
+    const context = this.context.get();
+    const requestId = context?.requestId ?? randomUUID();
+    const traceId = context?.traceId ?? requestId;
+
+    return this.prisma.$transaction(async (transaction) => {
+      const version = await transaction.documentVersion.create({
+        data: {
+          documentId,
+          versionNumber: latest.versionNumber + 1,
+          sourceType: 'URL',
+          sourceUrl,
+          originalFileName: 'captured-page.md',
+          fileExtension: 'md',
+          declaredMimeType: 'text/markdown',
+          processingStatus: 'FETCHING',
+          createdById: user.id,
+        },
+      });
+      const importTask = await transaction.importTask.create({
+        data: {
+          documentId,
+          versionId: version.id,
+          status: 'QUEUED',
+          stage: 'FETCHING',
+          progress: 5,
+          requestId,
+          traceId,
+          createdById: user.id,
+        },
+      });
+      const payload: DocumentUrlCaptureRequestedPayload = {
+        documentId,
+        spaceId: document.spaceId,
+        versionId: version.id,
+        importId: importTask.id,
+        sourceUrl,
+        actorId: user.id,
+        aclSnapshot: {
+          spaceId: document.spaceId,
+          documentSubjects: document.aclEntries,
+        },
+      };
+      await this.outbox.enqueue(transaction, {
+        type: 'document.url.capture.requested.v1',
+        taskId: importTask.id,
+        resourceId: version.id,
+        resourceVersion: 1,
+        traceId,
+        payload,
+      });
+      return {
+        documentId,
+        versionId: version.id,
+        importId: importTask.id,
+        status: 'QUEUED' as const,
+      };
+    });
   }
 
   async uploadContent(input: {
@@ -275,5 +432,14 @@ export class DocumentImportService {
       throw new NotFoundException('DOCUMENT_NOT_FOUND');
     }
     return document;
+  }
+
+  private async requireActiveSpace(spaceId: string): Promise<void> {
+    const space = await this.prisma.knowledgeSpace.findUnique({
+      where: { id: spaceId },
+      select: { status: true },
+    });
+    if (!space) throw new NotFoundException('SPACE_NOT_FOUND');
+    if (space.status !== 'ACTIVE') throw new ConflictException('SPACE_NOT_ACTIVE');
   }
 }

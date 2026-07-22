@@ -18,6 +18,7 @@ export const documentSourceTypeSchema = z.enum(['FILE', 'URL']);
 export const documentAvailabilitySchema = z.enum(['DRAFT', 'ACTIVE', 'INACTIVE', 'SOFT_DELETED']);
 export const documentProcessingStatusSchema = z.enum([
   'PENDING_UPLOAD',
+  'FETCHING',
   'QUEUED',
   'SECURITY_CHECK',
   'PARSING',
@@ -83,12 +84,34 @@ export const createFileImportsResponseSchema = z
   })
   .strict();
 
+export const createUrlImportSchema = z
+  .object({
+    url: z.url().max(2048),
+  })
+  .strict();
+
+export const createUrlImportResponseSchema = z
+  .object({
+    documentId: z.string().uuid(),
+    versionId: z.string().uuid(),
+    importId: z.string().uuid(),
+    status: z.literal('QUEUED'),
+  })
+  .strict();
+
 export const documentVersionSchema = z
   .object({
     id: z.string().uuid(),
     documentId: z.string().uuid(),
     versionNumber: z.int().positive(),
     sourceType: documentSourceTypeSchema,
+    sourceUrl: z.string().url().nullable(),
+    resolvedUrl: z.string().url().nullable(),
+    canonicalUrl: z.string().url().nullable(),
+    sourceAuthor: z.string().nullable(),
+    sourcePublishedAt: z.string().datetime().nullable(),
+    sourceFetchedAt: z.string().datetime().nullable(),
+    sourceCheckedAt: z.string().datetime().nullable(),
     originalFileName: z.string().min(1),
     declaredMimeType: z.string().min(1),
     detectedMimeType: z.string().nullable(),
@@ -147,6 +170,30 @@ const ingestionEventBaseSchema = z
   })
   .strict();
 
+const aclSnapshotSchema = z
+  .object({
+    spaceId: z.string().uuid(),
+    documentSubjects: z
+      .array(
+        z
+          .object({
+            subjectType: z.enum(['USER', 'DEPARTMENT', 'GROUP']),
+            subjectId: z.string().uuid(),
+          })
+          .strict(),
+      )
+      .max(10_000),
+  })
+  .strict();
+
+export const documentUrlCaptureRequestedPayloadSchema = ingestionEventBaseSchema
+  .extend({
+    sourceUrl: z.string().url().max(2048),
+    actorId: z.string().uuid(),
+    aclSnapshot: aclSnapshotSchema,
+  })
+  .strict();
+
 export const documentIngestionRequestedPayloadSchema = ingestionEventBaseSchema
   .extend({
     objectKey: z.string().min(1),
@@ -155,21 +202,7 @@ export const documentIngestionRequestedPayloadSchema = ingestionEventBaseSchema
     declaredMimeType: z.string().min(1),
     originalFileName: z.string().min(1),
     actorId: z.string().uuid(),
-    aclSnapshot: z
-      .object({
-        spaceId: z.string().uuid(),
-        documentSubjects: z
-          .array(
-            z
-              .object({
-                subjectType: z.enum(['USER', 'DEPARTMENT', 'GROUP']),
-                subjectId: z.string().uuid(),
-              })
-              .strict(),
-          )
-          .max(10_000),
-      })
-      .strict(),
+    aclSnapshot: aclSnapshotSchema,
   })
   .strict();
 
@@ -204,6 +237,7 @@ export const documentIngestionFailedPayloadSchema = ingestionEventBaseSchema
   .strict();
 
 export const documentIngestionEventTypeSchema = z.enum([
+  'document.url.capture.requested.v1',
   'document.ingestion.requested.v1',
   'document.ingestion.progressed.v1',
   'document.ingestion.completed.v1',
@@ -212,11 +246,16 @@ export const documentIngestionEventTypeSchema = z.enum([
 
 export type CreateFileImports = z.infer<typeof createFileImportsSchema>;
 export type CreateFileImportsResponse = z.infer<typeof createFileImportsResponseSchema>;
+export type CreateUrlImport = z.infer<typeof createUrlImportSchema>;
+export type CreateUrlImportResponse = z.infer<typeof createUrlImportResponseSchema>;
 export type DocumentSummary = z.infer<typeof documentSummarySchema>;
 export type DocumentVersion = z.infer<typeof documentVersionSchema>;
 export type ImportTask = z.infer<typeof importTaskSchema>;
 export type DocumentIngestionRequestedPayload = z.infer<
   typeof documentIngestionRequestedPayloadSchema
+>;
+export type DocumentUrlCaptureRequestedPayload = z.infer<
+  typeof documentUrlCaptureRequestedPayloadSchema
 >;
 export type DocumentIngestionProgressedPayload = z.infer<
   typeof documentIngestionProgressedPayloadSchema
