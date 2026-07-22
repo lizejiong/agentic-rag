@@ -19,7 +19,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireSpacePermission } from '../authorization/require-permission.decorator';
 import { SpacePermissionGuard } from '../authorization/space-permission.guard';
 import { DocumentImportService } from './document-import.service';
-import { parseCreateFileImports } from './document-import.validation';
+import { parseCreateFileImports, parseCreateUrlImport } from './document-import.validation';
 
 @Controller()
 @UseGuards(AccessTokenGuard)
@@ -35,6 +35,25 @@ export class DocumentImportController {
     @Body() input: unknown,
   ) {
     return this.imports.createFileImports(user, spaceId, parseCreateFileImports(input));
+  }
+
+  @Post('spaces/:spaceId/imports/urls')
+  @UseGuards(SpacePermissionGuard)
+  @RequireSpacePermission('EDIT')
+  createUrl(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('spaceId', ParseUUIDPipe) spaceId: string,
+    @Body() input: unknown,
+  ) {
+    return this.imports.createUrlImport(user, spaceId, parseCreateUrlImport(input));
+  }
+
+  @Post('documents/:documentId/refresh-url')
+  refreshUrl(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.imports.refreshUrl(user, documentId);
   }
 
   @Put('imports/:importId/content')

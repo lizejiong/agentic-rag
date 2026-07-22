@@ -1,5 +1,6 @@
 .superpowers/
 .worktrees/
+.pnpm-store/
 .env
 .env.*
 !.env.example

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createFileImportsSchema,
+  createUrlImportSchema,
   documentIngestionRequestedPayloadSchema,
+  documentUrlCaptureRequestedPayloadSchema,
   fileImportMetadataSchema,
 } from '../src/document-import';
 
@@ -59,5 +61,31 @@ describe('document import contracts', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it('accepts a strict public URL import request shape', () => {
+    expect(createUrlImportSchema.parse({ url: 'https://example.com/guide' })).toEqual({
+      url: 'https://example.com/guide',
+    });
+    expect(
+      createUrlImportSchema.safeParse({ url: 'https://example.com', unexpected: true }).success,
+    ).toBe(false);
+  });
+
+  it('validates a URL capture command payload', () => {
+    expect(
+      documentUrlCaptureRequestedPayloadSchema.safeParse({
+        documentId: '1c0078c7-5818-4527-966b-e0663c476374',
+        spaceId: 'b7b7cbbd-0d42-40dc-9895-86f7859166ea',
+        versionId: 'd57d4f96-82f4-454b-a101-071fcde1f119',
+        importId: '89321158-2038-4b7f-a20c-ea92e6b4090c',
+        sourceUrl: 'https://example.com/guide',
+        actorId: '806fcb79-225b-4ca5-bb67-f94a5b66d9c4',
+        aclSnapshot: {
+          spaceId: 'b7b7cbbd-0d42-40dc-9895-86f7859166ea',
+          documentSubjects: [],
+        },
+      }).success,
+    ).toBe(true);
   });
 });

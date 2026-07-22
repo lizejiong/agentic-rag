@@ -147,6 +147,46 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return entries;
   }
 
+  async streamAutoClaim(input: {
+    stream: string;
+    group: string;
+    consumer: string;
+    minIdleMilliseconds: number;
+    count?: number;
+  }): Promise<Array<{ id: string; message: Record<string, string> }>> {
+    await this.ensureConnected();
+    const response: unknown = await this.client.xAutoClaim(
+      input.stream,
+      input.group,
+      input.consumer,
+      input.minIdleMilliseconds,
+      '0-0',
+      { COUNT: input.count ?? 20 },
+    );
+    if (!response || typeof response !== 'object' || !('messages' in response)) return [];
+    const messages: unknown = response.messages;
+    if (!Array.isArray(messages)) return [];
+    return messages.flatMap((item: unknown) => {
+      if (
+        !item ||
+        typeof item !== 'object' ||
+        !('id' in item) ||
+        typeof item.id !== 'string' ||
+        !('message' in item) ||
+        !item.message ||
+        typeof item.message !== 'object'
+      ) {
+        return [];
+      }
+      const message = Object.fromEntries(
+        Object.entries(item.message).filter(
+          (field): field is [string, string] => typeof field[1] === 'string',
+        ),
+      );
+      return [{ id: item.id, message }];
+    });
+  }
+
   async streamAck(stream: string, group: string, id: string): Promise<void> {
     await this.ensureConnected();
     await this.client.xAck(stream, group, id);

@@ -15,5 +15,6 @@ export type EnqueueOutboxInput<T extends Record<string, unknown>> = {
   taskId?: string;
   resourceId: string;
   resourceVersion: number;
+  traceId?: string;
   payload: T;
 };
