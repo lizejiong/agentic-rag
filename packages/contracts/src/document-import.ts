@@ -155,6 +155,21 @@ export const documentIngestionRequestedPayloadSchema = ingestionEventBaseSchema
     declaredMimeType: z.string().min(1),
     originalFileName: z.string().min(1),
     actorId: z.string().uuid(),
+    aclSnapshot: z
+      .object({
+        spaceId: z.string().uuid(),
+        documentSubjects: z
+          .array(
+            z
+              .object({
+                subjectType: z.enum(['USER', 'DEPARTMENT', 'GROUP']),
+                subjectId: z.string().uuid(),
+              })
+              .strict(),
+          )
+          .max(10_000),
+      })
+      .strict(),
   })
   .strict();
 

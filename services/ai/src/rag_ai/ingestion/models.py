@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from rag_ai.ingestion.normalization.models import DocumentChunk, NormalizedDocument
+
 
 class ProcessingStage(StrEnum):
     QUEUED = "QUEUED"
@@ -43,6 +45,7 @@ class IngestionRequestedPayload(BaseModel):
     declared_mime_type: str = Field(alias="declaredMimeType", min_length=1, max_length=160)
     original_file_name: str = Field(alias="originalFileName", min_length=1, max_length=255)
     actor_id: UUID = Field(alias="actorId")
+    acl_snapshot: dict[str, Any] = Field(default_factory=dict, alias="aclSnapshot")
 
 
 class IngestionCommand(BaseModel):
@@ -63,10 +66,8 @@ class IngestionCommand(BaseModel):
 
 
 class IngestionResult(BaseModel):
-    normalized_document_id: UUID
-    chunk_count: int = Field(ge=0)
-    detected_mime_type: str = Field(min_length=1, max_length=160)
-    parser_version: str = Field(min_length=1, max_length=120)
+    document: NormalizedDocument
+    chunks: list[DocumentChunk]
 
 
 class WorkerEvent(BaseModel):
@@ -96,7 +97,3 @@ class IngestionFailure(Exception):
         self.code = code[:120]
         self.safe_message = message[:1000]
         self.retryable = retryable
-
-
-class IngestionDeferred(Exception):
-    """Leave the stream message pending because required processing capability is not ready."""

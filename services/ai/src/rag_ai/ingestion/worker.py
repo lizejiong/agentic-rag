@@ -3,15 +3,14 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Protocol
 
 from pydantic import ValidationError
 
 from rag_ai.infrastructure.redis.stream_worker import RedisStreamTransport, StreamMessage
-from rag_ai.infrastructure.storage.minio_storage import MinioStorage
 from rag_ai.ingestion.models import (
     IngestionCommand,
-    IngestionDeferred,
     IngestionFailure,
     IngestionResult,
     OutboxEnvelope,
@@ -23,27 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 class IngestionProcessor(Protocol):
-    async def process(self, command: IngestionCommand) -> IngestionResult: ...
-
-
-class PipelineUnavailableProcessor:
-    """Temporary production guard until the parser pipeline lands in task 5."""
-
-    def __init__(self, storage: MinioStorage) -> None:
-        self._storage = storage
-
-    async def process(self, command: IngestionCommand) -> IngestionResult:
-        stored_bytes = await self._storage.stat_quarantine(command.payload.object_key)
-        if stored_bytes != command.payload.size_bytes:
-            raise IngestionFailure(
-                "QUARANTINE_SIZE_MISMATCH",
-                "The quarantined object size does not match the accepted upload.",
-                retryable=False,
-            )
-        raise IngestionDeferred(
-            "INGESTION_PIPELINE_NOT_READY",
-            "The parser pipeline is not available yet; keep the command pending.",
-        )
+    async def process(
+        self,
+        command: IngestionCommand,
+        report: Callable[[ProcessingStage, int], Awaitable[None]],
+    ) -> IngestionResult: ...
 
 
 class DurableIngestionWorker:
@@ -108,16 +91,15 @@ class DurableIngestionWorker:
         stage = ProcessingStage.SECURITY_CHECK
         try:
             await self._repository.progress(command, stage, 10)
-            result = await self._processor.process(command)
+            result = await self._processor.process(
+                command,
+                lambda next_stage, progress: self._repository.progress(
+                    command, next_stage, progress
+                ),
+            )
             await self._repository.succeed(command, result)
         except IngestionFailure as ingestion_failure:
             await self._repository.fail(command, ingestion_failure, stage)
-        except IngestionDeferred:
-            logger.info(
-                "Ingestion deferred without ACK",
-                extra={"event_id": str(envelope.event_id)},
-            )
-            return
         except Exception:
             logger.exception(
                 "Unexpected ingestion failure", extra={"event_id": str(envelope.event_id)}

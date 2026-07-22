@@ -120,6 +120,141 @@ a {
   cursor: pointer;
 }
 
+.account-state a,
+.document-nav a {
+  color: #9fcfc3;
+  text-decoration: none;
+}
+
+.documents-layout {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 54px 0 80px;
+}
+
+.documents-heading,
+.document-nav,
+.document-card,
+.upload-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.documents-heading select {
+  min-width: 220px;
+  padding: 10px 12px;
+  color: #dbe6e3;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: #11161d;
+}
+
+.upload-panel {
+  margin: 38px 0 26px;
+  padding: 26px;
+  align-items: flex-start;
+  border: 1px solid rgba(101, 197, 178, 0.22);
+  border-radius: 18px;
+  background: rgba(101, 197, 178, 0.045);
+}
+
+.upload-panel h2,
+.document-card h2 {
+  margin-bottom: 7px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.upload-panel p,
+.document-card p,
+.document-empty {
+  margin-bottom: 0;
+  color: #7e8997;
+  font-size: 13px;
+}
+
+.upload-button {
+  flex: 0 0 auto;
+  padding: 11px 16px;
+  color: #07110f;
+  border: 0;
+  border-radius: 10px;
+  background: #8bddc8;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.upload-button:disabled {
+  opacity: 0.5;
+}
+
+.upload-rows {
+  min-width: 320px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 9px;
+  list-style: none;
+}
+
+.upload-rows li {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) 100px 105px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.upload-rows span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-rows small {
+  color: #89958f;
+}
+
+.document-list {
+  display: grid;
+  gap: 12px;
+}
+
+.document-card {
+  padding: 22px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: #10151c;
+}
+
+.document-status {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.document-status strong {
+  color: #8bddc8;
+}
+
+.document-status span {
+  color: #6f7b88;
+  font-size: 10px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .chat-layout {
   width: min(100%, 1320px);
   min-height: calc(100vh - 76px);
@@ -646,6 +781,17 @@ h1 {
 
   .login-panel {
     padding: 30px 22px;
+  }
+
+  .documents-heading,
+  .upload-panel,
+  .document-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .upload-rows {
+    min-width: 0;
   }
 }
 

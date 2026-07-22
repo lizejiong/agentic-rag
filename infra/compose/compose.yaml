@@ -13,6 +13,9 @@ x-ai-service: &ai-service
     MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
     MINIO_USE_SSL: "false"
     MINIO_QUARANTINE_BUCKET: ${MINIO_QUARANTINE_BUCKET:-atlas-rag-quarantine}
+    CLAMAV_HOST: clamav
+    CLAMAV_PORT: 3310
+    CLAMAV_REQUIRED: "true"
   depends_on: &ai-dependencies
     postgres:
       condition: service_healthy
@@ -20,6 +23,8 @@ x-ai-service: &ai-service
       condition: service_healthy
     minio-init:
       condition: service_completed_successfully
+    clamav:
+      condition: service_healthy
   restart: unless-stopped
 
 services:
@@ -161,6 +166,21 @@ services:
         mc anonymous set none "local/$${MINIO_DOCUMENT_BUCKET}"
     restart: "no"
 
+  clamav:
+    image: clamav/clamav:1.4.3
+    ports:
+      - "127.0.0.1:${CLAMAV_PORT:-3310}:3310"
+    volumes:
+      - clamav-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 1 >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 90s
+    mem_limit: 2g
+    restart: unless-stopped
+
   ai:
     <<: *ai-service
     command: ["uvicorn", "rag_ai.main:app", "--host", "0.0.0.0", "--port", "8001"]
@@ -192,3 +212,4 @@ volumes:
   neo4j-logs:
   redis-data:
   minio-data:
+  clamav-data:

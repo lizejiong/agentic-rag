@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from hashlib import sha256
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from minio import Minio
 
@@ -38,6 +42,37 @@ class MinioStorage:
         finally:
             response.close()
             response.release_conn()
+
+    @asynccontextmanager
+    async def materialize_quarantine(
+        self,
+        object_key: str,
+        *,
+        original_file_name: str,
+        expected_bytes: int,
+        expected_hash: str,
+    ) -> AsyncIterator[Path]:
+        with TemporaryDirectory(prefix="atlas-ingestion-") as directory:
+            suffix = Path(original_file_name).suffix.lower()
+            path = Path(directory) / f"source{suffix}"
+            digest = sha256()
+            actual_bytes = 0
+            with path.open("wb") as target:
+                async for chunk in self.stream_quarantine(object_key):
+                    actual_bytes += len(chunk)
+                    if actual_bytes > expected_bytes:
+                        raise QuarantineIntegrityError("QUARANTINE_SIZE_MISMATCH")
+                    digest.update(chunk)
+                    await asyncio.to_thread(target.write, chunk)
+            if actual_bytes != expected_bytes:
+                raise QuarantineIntegrityError("QUARANTINE_SIZE_MISMATCH")
+            if digest.hexdigest() != expected_hash:
+                raise QuarantineIntegrityError("QUARANTINE_HASH_MISMATCH")
+            yield path
+
+
+class QuarantineIntegrityError(Exception):
+    pass
 
 
 def create_minio_storage(

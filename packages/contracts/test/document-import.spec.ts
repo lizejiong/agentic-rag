@@ -52,6 +52,10 @@ describe('document import contracts', () => {
       declaredMimeType: 'application/pdf',
       originalFileName: '产品手册.pdf',
       actorId: '806fcb79-225b-4ca5-bb67-f94a5b66d9c4',
+      aclSnapshot: {
+        spaceId: 'b7b7cbbd-0d42-40dc-9895-86f7859166ea',
+        documentSubjects: [],
+      },
     });
 
     expect(result.success).toBe(true);

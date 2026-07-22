@@ -126,13 +126,103 @@ class IngestionRepository:
 
     async def succeed(self, command: IngestionCommand, result: IngestionResult) -> None:
         payload = self._base_payload(command) | {
-            "normalizedDocumentId": str(result.normalized_document_id),
-            "chunkCount": result.chunk_count,
-            "detectedMimeType": result.detected_mime_type,
-            "parserVersion": result.parser_version,
+            "normalizedDocumentId": str(result.document.id),
+            "chunkCount": len(result.chunks),
+            "detectedMimeType": result.document.detected_mime_type,
+            "parserVersion": result.document.parser_version,
         }
         event = self._event(command, "document.ingestion.completed.v1", payload)
         async with self._engine.begin() as connection:
+            await connection.execute(
+                text("DELETE FROM rag.normalized_documents WHERE version_id = :version_id"),
+                {"version_id": command.payload.version_id},
+            )
+            await connection.execute(
+                text(
+                    """
+                    INSERT INTO rag.normalized_documents (
+                        id, version_id, document_id, space_id, title, metadata
+                    ) VALUES (
+                        :id, :version_id, :document_id, :space_id, :title,
+                        CAST(:metadata AS jsonb)
+                    )
+                    """
+                ),
+                {
+                    "id": result.document.id,
+                    "version_id": command.payload.version_id,
+                    "document_id": command.payload.document_id,
+                    "space_id": command.payload.space_id,
+                    "title": result.document.title,
+                    "metadata": json.dumps(result.document.metadata, ensure_ascii=False),
+                },
+            )
+            if result.document.elements:
+                await connection.execute(
+                    text(
+                        """
+                        INSERT INTO rag.normalized_elements (
+                            id, normalized_document_id, element_index, element_type,
+                            content, location, metadata
+                        ) VALUES (
+                            :id, :normalized_document_id, :element_index, :element_type,
+                            :content, CAST(:location AS jsonb), CAST(:metadata AS jsonb)
+                        )
+                        """
+                    ),
+                    [
+                        {
+                            "id": element.id,
+                            "normalized_document_id": result.document.id,
+                            "element_index": element.index,
+                            "element_type": element.type.value,
+                            "content": element.text,
+                            "location": element.location.model_dump_json(exclude_none=True),
+                            "metadata": json.dumps(element.metadata, ensure_ascii=False),
+                        }
+                        for element in result.document.elements
+                    ],
+                )
+            if result.chunks:
+                acl_snapshot = json.dumps(command.payload.acl_snapshot, ensure_ascii=False)
+                await connection.execute(
+                    text(
+                        """
+                        INSERT INTO rag.chunks (
+                            id, normalized_document_id, document_id, version_id, space_id,
+                            chunk_index, content, content_hash, token_count,
+                            parent_chunk_id, previous_chunk_id, next_chunk_id,
+                            location, acl_snapshot, element_ids
+                        ) VALUES (
+                            :id, :normalized_document_id, :document_id, :version_id, :space_id,
+                            :chunk_index, :content, :content_hash, :token_count,
+                            :parent_chunk_id, :previous_chunk_id, :next_chunk_id,
+                            CAST(:location AS jsonb), CAST(:acl_snapshot AS jsonb),
+                            CAST(:element_ids AS jsonb)
+                        )
+                        """
+                    ),
+                    [
+                        {
+                            "id": chunk.id,
+                            "normalized_document_id": result.document.id,
+                            "document_id": command.payload.document_id,
+                            "version_id": command.payload.version_id,
+                            "space_id": command.payload.space_id,
+                            "chunk_index": chunk.index,
+                            "content": chunk.text,
+                            "content_hash": chunk.content_hash,
+                            "token_count": chunk.token_count,
+                            "parent_chunk_id": chunk.parent_chunk_id,
+                            "previous_chunk_id": chunk.previous_chunk_id,
+                            "next_chunk_id": chunk.next_chunk_id,
+                            "location": chunk.location.model_dump_json(exclude_none=True),
+                            "acl_snapshot": acl_snapshot,
+                            "element_ids": json.dumps([str(value) for value in chunk.element_ids]),
+                        }
+                        for chunk in result.chunks
+                    ],
+                )
             await connection.execute(
                 text(
                     """

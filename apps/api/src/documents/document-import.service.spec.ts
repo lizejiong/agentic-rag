@@ -40,7 +40,7 @@ function createDependencies() {
       findUnique: jest.fn().mockResolvedValue({ status: 'ACTIVE' }),
     },
     document: {
-      findUnique: jest.fn().mockResolvedValue({ spaceId: 'space-1' }),
+      findUnique: jest.fn().mockResolvedValue({ spaceId: 'space-1', aclEntries: [] }),
     },
     importTask: {
       findUnique: jest.fn(),
@@ -137,6 +137,15 @@ describe('DocumentImportService', () => {
         resourceId: 'version-1',
       }),
     );
+    // Jest's untyped dependency mock exposes calls as any; narrow the captured contract here.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const enqueued = outbox.enqueue.mock.calls[0]?.[1] as {
+      payload: { aclSnapshot: { spaceId: string; documentSubjects: unknown[] } };
+    };
+    expect(enqueued.payload.aclSnapshot).toEqual({
+      spaceId: 'space-1',
+      documentSubjects: [],
+    });
   });
 
   it('rejects a Content-Length that differs from the declared file size', async () => {

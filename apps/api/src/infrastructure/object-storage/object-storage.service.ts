@@ -68,6 +68,7 @@ class UploadMeter extends Transform {
 export class ObjectStorageService implements OnModuleInit {
   private readonly quarantineBucket: string;
   private readonly documentBucket: string;
+  private readonly validateBucketsOnStartup: boolean;
 
   constructor(
     @Inject(MINIO_CLIENT) private readonly client: ObjectStorageClient,
@@ -75,9 +76,13 @@ export class ObjectStorageService implements OnModuleInit {
   ) {
     this.quarantineBucket = environment.MINIO_QUARANTINE_BUCKET;
     this.documentBucket = environment.MINIO_DOCUMENT_BUCKET;
+    this.validateBucketsOnStartup = environment.NODE_ENV !== 'test';
   }
 
   async onModuleInit(): Promise<void> {
+    if (!this.validateBucketsOnStartup) {
+      return;
+    }
     const buckets = [this.quarantineBucket, this.documentBucket];
     const existence = await Promise.all(buckets.map((bucket) => this.client.bucketExists(bucket)));
     const missingBucket = buckets.find((_bucket, index) => !existence[index]);

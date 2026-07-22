@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from collections.abc import Awaitable, Callable
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -9,12 +10,12 @@ import pytest
 from rag_ai.infrastructure.redis.stream_worker import RedisStreamTransport, StreamMessage
 from rag_ai.ingestion.models import (
     IngestionCommand,
-    IngestionDeferred,
     IngestionFailure,
     IngestionResult,
     ProcessingStage,
     WorkerEvent,
 )
+from rag_ai.ingestion.normalization.models import NormalizedDocument
 from rag_ai.ingestion.repository import IngestionRepository, PendingOutboxEvent
 from rag_ai.ingestion.worker import (
     DurableIngestionWorker,
@@ -122,26 +123,32 @@ class FakeRepository:
 
 
 class SuccessfulProcessor:
-    async def process(self, command: IngestionCommand) -> IngestionResult:
+    async def process(
+        self,
+        command: IngestionCommand,
+        report: Callable[[ProcessingStage, int], Awaitable[None]],
+    ) -> IngestionResult:
         del command
+        await report(ProcessingStage.PARSING, 40)
         return IngestionResult(
-            normalized_document_id=uuid4(),
-            chunk_count=3,
-            detected_mime_type="text/plain",
-            parser_version="test-parser/1",
+            document=NormalizedDocument(
+                title="note",
+                detected_mime_type="text/plain",
+                parser_version="test-parser/1",
+                elements=[],
+            ),
+            chunks=[],
         )
 
 
 class FailingProcessor:
-    async def process(self, command: IngestionCommand) -> IngestionResult:
-        del command
+    async def process(
+        self,
+        command: IngestionCommand,
+        report: Callable[[ProcessingStage, int], Awaitable[None]],
+    ) -> IngestionResult:
+        del command, report
         raise IngestionFailure("VIRUS_FOUND", "Malware was detected.", retryable=False)
-
-
-class DeferredProcessor:
-    async def process(self, command: IngestionCommand) -> IngestionResult:
-        del command
-        raise IngestionDeferred("Parser is not installed yet.")
 
 
 def build_worker(
@@ -166,7 +173,10 @@ async def test_commits_success_before_acknowledging() -> None:
     worker = build_worker(transport, repository, SuccessfulProcessor())
 
     assert await worker.run_once() == 1
-    assert repository.progressed == [(ProcessingStage.SECURITY_CHECK, 10)]
+    assert repository.progressed == [
+        (ProcessingStage.SECURITY_CHECK, 10),
+        (ProcessingStage.PARSING, 40),
+    ]
     assert len(repository.succeeded) == 1
     assert transport.acknowledged == ["1-0"]
 
@@ -203,18 +213,6 @@ async def test_invalid_event_moves_to_dead_letter_before_acknowledging() -> None
     await worker.run_once()
     assert transport.published[0][0] == "atlas:events:dead-letter"
     assert transport.acknowledged == ["bad-1"]
-
-
-@pytest.mark.asyncio
-async def test_deferred_processing_leaves_the_message_pending() -> None:
-    transport = FakeTransport([requested_message()])
-    repository = FakeRepository()
-    worker = build_worker(transport, repository, DeferredProcessor())
-
-    await worker.run_once()
-    assert repository.succeeded == []
-    assert repository.failed == []
-    assert transport.acknowledged == []
 
 
 @pytest.mark.asyncio

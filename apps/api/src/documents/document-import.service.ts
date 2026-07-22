@@ -113,7 +113,8 @@ export class DocumentImportService {
     if (!task) {
       throw new NotFoundException('IMPORT_TASK_NOT_FOUND');
     }
-    const spaceId = await this.documentSpaceId(task.documentId);
+    const documentContext = await this.documentContext(task.documentId);
+    const spaceId = documentContext.spaceId;
     await this.spacePolicy.require(input.user, spaceId, 'EDIT');
 
     const { maxBytes } = validateImportFile(task.version.originalFileName, input.contentLength);
@@ -159,6 +160,10 @@ export class DocumentImportService {
         declaredMimeType: task.version.declaredMimeType,
         originalFileName: task.version.originalFileName,
         actorId: input.user.id,
+        aclSnapshot: {
+          spaceId,
+          documentSubjects: documentContext.aclEntries,
+        },
       };
       await this.prisma.$transaction(async (transaction) => {
         await transaction.documentVersion.update({
@@ -258,14 +263,17 @@ export class DocumentImportService {
     return task;
   }
 
-  private async documentSpaceId(documentId: string): Promise<string> {
+  private async documentContext(documentId: string) {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },
-      select: { spaceId: true },
+      select: {
+        spaceId: true,
+        aclEntries: { select: { subjectType: true, subjectId: true } },
+      },
     });
     if (!document) {
       throw new NotFoundException('DOCUMENT_NOT_FOUND');
     }
-    return document.spaceId;
+    return document;
   }
 }
