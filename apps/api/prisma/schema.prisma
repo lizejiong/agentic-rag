@@ -56,6 +56,38 @@ enum DocumentAvailability {
   @@schema("app")
 }
 
+enum DocumentSourceType {
+  FILE
+  URL
+
+  @@schema("app")
+}
+
+enum DocumentProcessingStatus {
+  PENDING_UPLOAD
+  QUEUED
+  SECURITY_CHECK
+  PARSING
+  NORMALIZING
+  CHUNKING
+  READY
+  FAILED
+  CANCELLED
+
+  @@schema("app")
+}
+
+enum ImportTaskStatus {
+  PENDING_UPLOAD
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+
+  @@schema("app")
+}
+
 enum EgressPolicy {
   LOCAL_ONLY
   REDACTED_CLOUD
@@ -81,21 +113,24 @@ enum OutboxStatus {
 }
 
 model User {
-  id               String           @id @default(uuid()) @db.Uuid
-  username         String           @unique @db.VarChar(80)
-  displayName      String           @db.VarChar(120)
-  passwordHash     String           @map("password_hash")
-  role             SystemRole       @default(MEMBER)
-  status           UserStatus       @default(ACTIVE)
-  departmentId     String?          @map("department_id") @db.Uuid
-  failedLoginCount Int              @default(0) @map("failed_login_count")
-  lockedUntil      DateTime?        @map("locked_until") @db.Timestamptz(3)
-  tokenVersion     Int              @default(0) @map("token_version")
-  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
-  department       Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  id               String            @id @default(uuid()) @db.Uuid
+  username         String            @unique @db.VarChar(80)
+  displayName      String            @db.VarChar(120)
+  passwordHash     String            @map("password_hash")
+  role             SystemRole        @default(MEMBER)
+  status           UserStatus        @default(ACTIVE)
+  departmentId     String?           @map("department_id") @db.Uuid
+  failedLoginCount Int               @default(0) @map("failed_login_count")
+  lockedUntil      DateTime?         @map("locked_until") @db.Timestamptz(3)
+  tokenVersion     Int               @default(0) @map("token_version")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  department       Department?       @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   groupMemberships GroupMember[]
-  createdSpaces    KnowledgeSpace[] @relation("SpaceCreator")
+  createdSpaces    KnowledgeSpace[]  @relation("SpaceCreator")
+  createdDocuments Document[]        @relation("DocumentCreator")
+  createdVersions  DocumentVersion[] @relation("DocumentVersionCreator")
+  createdImports   ImportTask[]      @relation("ImportTaskCreator")
   refreshSessions  RefreshSession[]
 
   @@index([departmentId])
@@ -129,11 +164,11 @@ model UserGroup {
 }
 
 model GroupMember {
-  groupId  String    @map("group_id") @db.Uuid
-  userId   String    @map("user_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  group    UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groupId   String    @map("group_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  group     UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([groupId, userId])
   @@index([userId])
@@ -142,23 +177,23 @@ model GroupMember {
 }
 
 model KnowledgeSpace {
-  id                     String            @id @default(uuid()) @db.Uuid
-  name                   String            @db.VarChar(160)
+  id                     String       @id @default(uuid()) @db.Uuid
+  name                   String       @db.VarChar(160)
   description            String?
-  tags                   String[]          @default([])
-  defaultLanguage        String            @default("zh-CN") @map("default_language") @db.VarChar(20)
-  egressPolicy           EgressPolicy      @default(LOCAL_ONLY) @map("egress_policy")
-  llmEnabled             Boolean           @default(true) @map("llm_enabled")
-  embeddingEnabled       Boolean           @default(true) @map("embedding_enabled")
-  rerankerEnabled        Boolean           @default(true) @map("reranker_enabled")
-  asrEnabled             Boolean           @default(true) @map("asr_enabled")
-  ttsEnabled             Boolean           @default(true) @map("tts_enabled")
-  graphExtractionEnabled Boolean           @default(false) @map("graph_extraction_enabled")
-  status                 SpaceStatus       @default(ACTIVE)
-  createdById            String            @map("created_by_id") @db.Uuid
-  createdAt              DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt              DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
-  createdBy              User              @relation("SpaceCreator", fields: [createdById], references: [id])
+  tags                   String[]     @default([])
+  defaultLanguage        String       @default("zh-CN") @map("default_language") @db.VarChar(20)
+  egressPolicy           EgressPolicy @default(LOCAL_ONLY) @map("egress_policy")
+  llmEnabled             Boolean      @default(true) @map("llm_enabled")
+  embeddingEnabled       Boolean      @default(true) @map("embedding_enabled")
+  rerankerEnabled        Boolean      @default(true) @map("reranker_enabled")
+  asrEnabled             Boolean      @default(true) @map("asr_enabled")
+  ttsEnabled             Boolean      @default(true) @map("tts_enabled")
+  graphExtractionEnabled Boolean      @default(false) @map("graph_extraction_enabled")
+  status                 SpaceStatus  @default(ACTIVE)
+  createdById            String       @map("created_by_id") @db.Uuid
+  createdAt              DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdBy              User         @relation("SpaceCreator", fields: [createdById], references: [id])
   grants                 SpaceGrant[]
   documents              Document[]
 
@@ -186,17 +221,110 @@ model SpaceGrant {
 }
 
 model Document {
-  id           String               @id @default(uuid()) @db.Uuid
-  spaceId      String               @map("space_id") @db.Uuid
-  title        String               @db.VarChar(300)
-  availability DocumentAvailability @default(DRAFT)
-  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
-  space        KnowledgeSpace       @relation(fields: [spaceId], references: [id], onDelete: Restrict)
-  aclEntries   DocumentAclEntry[]
+  id              String               @id @default(uuid()) @db.Uuid
+  spaceId         String               @map("space_id") @db.Uuid
+  title           String               @db.VarChar(300)
+  sourceType      DocumentSourceType   @default(FILE) @map("source_type")
+  availability    DocumentAvailability @default(DRAFT)
+  activeVersionId String?              @unique @map("active_version_id") @db.Uuid
+  createdById     String?              @map("created_by_id") @db.Uuid
+  deletedAt       DateTime?            @map("deleted_at") @db.Timestamptz(3)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  space           KnowledgeSpace       @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+  createdBy       User?                @relation("DocumentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  activeVersion   DocumentVersion?     @relation("ActiveDocumentVersion", fields: [activeVersionId], references: [id], onDelete: SetNull)
+  versions        DocumentVersion[]    @relation("DocumentVersions")
+  importTasks     ImportTask[]
+  aclEntries      DocumentAclEntry[]
 
   @@index([spaceId, availability])
+  @@index([createdById])
+  @@index([deletedAt])
   @@map("documents")
+  @@schema("app")
+}
+
+model DocumentVersion {
+  id                 String                   @id @default(uuid()) @db.Uuid
+  documentId         String                   @map("document_id") @db.Uuid
+  versionNumber      Int                      @map("version_number")
+  sourceType         DocumentSourceType       @map("source_type")
+  sourceUrl          String?                  @map("source_url") @db.VarChar(2048)
+  originalFileName   String                   @map("original_file_name") @db.VarChar(255)
+  fileExtension      String                   @map("file_extension") @db.VarChar(16)
+  declaredMimeType   String                   @map("declared_mime_type") @db.VarChar(160)
+  detectedMimeType   String?                  @map("detected_mime_type") @db.VarChar(160)
+  sizeBytes          Int?                     @map("size_bytes")
+  contentHash        String?                  @map("content_hash") @db.Char(64)
+  storedObjectId     String?                  @map("stored_object_id") @db.Uuid
+  processingStatus   DocumentProcessingStatus @default(PENDING_UPLOAD) @map("processing_status")
+  parserVersion      String?                  @map("parser_version") @db.VarChar(120)
+  processingStrategy String?                  @map("processing_strategy") @db.VarChar(120)
+  errorCode          String?                  @map("error_code") @db.VarChar(120)
+  errorMessage       String?                  @map("error_message")
+  createdById        String                   @map("created_by_id") @db.Uuid
+  publishedAt        DateTime?                @map("published_at") @db.Timestamptz(3)
+  createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  document           Document                 @relation("DocumentVersions", fields: [documentId], references: [id], onDelete: Restrict)
+  activeForDocument  Document?                @relation("ActiveDocumentVersion")
+  storedObject       StoredObject?            @relation(fields: [storedObjectId], references: [id], onDelete: Restrict)
+  createdBy          User                     @relation("DocumentVersionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  importTask         ImportTask?
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId, processingStatus])
+  @@index([contentHash])
+  @@index([storedObjectId])
+  @@index([createdById])
+  @@map("document_versions")
+  @@schema("app")
+}
+
+model StoredObject {
+  id               String            @id @default(uuid()) @db.Uuid
+  contentHash      String            @unique @map("content_hash") @db.Char(64)
+  bucket           String            @db.VarChar(120)
+  objectKey        String            @unique @map("object_key") @db.VarChar(1024)
+  sizeBytes        Int               @map("size_bytes")
+  detectedMimeType String            @map("detected_mime_type") @db.VarChar(160)
+  refCount         Int               @default(0) @map("ref_count")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  versions         DocumentVersion[]
+
+  @@index([refCount])
+  @@map("stored_objects")
+  @@schema("app")
+}
+
+model ImportTask {
+  id                  String                   @id @default(uuid()) @db.Uuid
+  documentId          String                   @map("document_id") @db.Uuid
+  versionId           String                   @unique @map("version_id") @db.Uuid
+  status              ImportTaskStatus         @default(PENDING_UPLOAD)
+  stage               DocumentProcessingStatus @default(PENDING_UPLOAD)
+  progress            Int                      @default(0)
+  quarantineObjectKey String?                  @map("quarantine_object_key") @db.VarChar(1024)
+  requestId           String                   @map("request_id") @db.VarChar(120)
+  traceId             String                   @map("trace_id") @db.VarChar(120)
+  attempt             Int                      @default(0)
+  errorCode           String?                  @map("error_code") @db.VarChar(120)
+  errorMessage        String?                  @map("error_message")
+  createdById         String                   @map("created_by_id") @db.Uuid
+  startedAt           DateTime?                @map("started_at") @db.Timestamptz(3)
+  completedAt         DateTime?                @map("completed_at") @db.Timestamptz(3)
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  document            Document                 @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  version             DocumentVersion          @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  createdBy           User                     @relation("ImportTaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([documentId, createdAt])
+  @@index([status, updatedAt])
+  @@index([createdById])
+  @@map("import_tasks")
   @@schema("app")
 }
 
@@ -287,8 +415,8 @@ model OutboxEvent {
 }
 
 model ProcessedEvent {
-  eventId    String   @map("event_id") @db.Uuid
-  consumer   String   @db.VarChar(120)
+  eventId     String   @map("event_id") @db.Uuid
+  consumer    String   @db.VarChar(120)
   processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz(3)
 
   @@id([eventId, consumer])

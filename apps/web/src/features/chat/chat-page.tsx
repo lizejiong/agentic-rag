@@ -67,6 +67,9 @@ export function ChatPage() {
           </span>
         </a>
         <div className="account-state">
+          {selectedSpaceIds[0] ? (
+            <a href={`/spaces/${selectedSpaceIds[0]}/documents`}>文档管理</a>
+          ) : null}
           <span>{auth.user?.username}</span>
           <button type="button" onClick={() => void auth.logout()}>
             退出

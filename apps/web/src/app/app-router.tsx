@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { LoginPage } from '../features/auth/login-page';
 import { useAuth } from '../features/auth/auth-provider';
 import { ChatPage } from '../features/chat/chat-page';
+import { DocumentListPage } from '../features/documents/document-list-page';
 
 export function AppRouter() {
   return (
@@ -24,6 +25,14 @@ export function AppRouter() {
           element={
             <RequireAuthentication>
               <ChatPage />
+            </RequireAuthentication>
+          }
+        />
+        <Route
+          path="/spaces/:spaceId/documents"
+          element={
+            <RequireAuthentication>
+              <DocumentListPage />
             </RequireAuthentication>
           }
         />

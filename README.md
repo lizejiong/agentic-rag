@@ -68,3 +68,7 @@ pnpm dev:web
 所有选定知识空间在调用 AI 前执行 PostgreSQL 真相源授权；文档搜索、引用、预览和下载
 共享同一授权服务。生产部署仍需替换示例密钥、启用安全 cookie、配置 TLS，并完成后续
 文档处理与检索阶段的安全验收。
+
+## Document ingestion
+
+Phase 2A now includes durable document tasks, streaming quarantine upload, ClamAV scanning, safe PDF/OpenXML validation, Docling-based normalization, structure-aware chunks, atomic version publication, and a React document manager with three concurrent uploads. See [document ingestion operations](docs/development/document-ingestion.md) for supported formats, configuration, recovery, and failure codes.

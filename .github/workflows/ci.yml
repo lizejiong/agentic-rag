@@ -88,6 +88,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Validate local infrastructure definition
+        run: docker compose --env-file infra/compose/.env.example -f infra/compose/compose.yaml config --quiet
+
   infrastructure-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -101,7 +104,7 @@ jobs:
       - name: Start complete local data platform
         run: |
           cp infra/compose/.env.example infra/compose/.env
-          docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml up -d --wait --wait-timeout 240 postgres elasticsearch neo4j redis minio
+          docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml up -d --wait --wait-timeout 300 postgres elasticsearch neo4j redis minio clamav
           docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml run --rm minio-init
 
       - name: Verify all infrastructure health checks

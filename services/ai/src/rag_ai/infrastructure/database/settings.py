@@ -25,6 +25,11 @@ class DatabaseSettings(BaseSettings):
         value = str(self.database_url)
         return value.replace("postgresql://", "postgresql+psycopg://", 1)
 
+    @property
+    def async_sqlalchemy_url(self) -> str:
+        value = str(self.database_url)
+        return value.replace("postgresql://", "postgresql+psycopg_async://", 1)
+
 
 @lru_cache
 def get_database_settings() -> DatabaseSettings:

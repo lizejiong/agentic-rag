@@ -33,6 +33,7 @@
     "ai": "7.0.31",
     "argon2": "^0.45.0",
     "cookie-parser": "^1.4.7",
+    "minio": "8.0.7",
     "pg": "8.22.0",
     "redis": "^6.1.0",
     "reflect-metadata": "^0.2.2",
