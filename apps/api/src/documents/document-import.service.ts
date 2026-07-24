@@ -411,13 +411,29 @@ export class DocumentImportService {
   async getTask(user: AuthenticatedUser, importId: string) {
     const task = await this.prisma.importTask.findUnique({
       where: { id: importId },
-      include: { document: { select: { spaceId: true } } },
+      select: {
+        id: true,
+        documentId: true,
+        versionId: true,
+        status: true,
+        stage: true,
+        progress: true,
+        attempt: true,
+        errorCode: true,
+        errorMessage: true,
+        startedAt: true,
+        completedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        document: { select: { spaceId: true } },
+      },
     });
     if (!task) {
       throw new NotFoundException('IMPORT_TASK_NOT_FOUND');
     }
-    await this.spacePolicy.require(user, task.document.spaceId, 'VIEW');
-    return task;
+    const { document, ...publicTask } = task;
+    await this.spacePolicy.require(user, document.spaceId, 'VIEW');
+    return publicTask;
   }
 
   private async documentContext(documentId: string) {
