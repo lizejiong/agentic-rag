@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions, PipelineOptions
+from docling.datamodel.pipeline_options import ConvertPipelineOptions, PdfPipelineOptions
 from docling.document_converter import (
     DocumentConverter,
     ExcelFormatOption,
@@ -35,7 +35,7 @@ class DoclingParser:
     }
 
     def __init__(self, *, timeout_seconds: int, max_file_size: int = 200 * 1024 * 1024) -> None:
-        simple_options = PipelineOptions(
+        simple_options = ConvertPipelineOptions(
             document_timeout=float(timeout_seconds),
             enable_remote_services=False,
             allow_external_plugins=False,

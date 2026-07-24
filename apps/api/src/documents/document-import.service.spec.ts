@@ -203,6 +203,55 @@ describe('DocumentImportService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(storage.putQuarantineObject).not.toHaveBeenCalled();
   });
+
+  it('returns only the public import task fields', async () => {
+    const { service, prisma, policy } = createDependencies();
+    const startedAt = new Date('2026-07-23T12:00:00.000Z');
+    const createdAt = new Date('2026-07-23T11:59:00.000Z');
+    const updatedAt = new Date('2026-07-23T12:01:00.000Z');
+    prisma.importTask.findUnique.mockResolvedValue({
+      id: 'import-1',
+      documentId: 'document-1',
+      versionId: 'version-1',
+      status: 'RUNNING',
+      stage: 'FETCHING',
+      progress: 10,
+      attempt: 1,
+      errorCode: null,
+      errorMessage: null,
+      startedAt,
+      completedAt: null,
+      createdAt,
+      updatedAt,
+      document: { spaceId: 'space-1' },
+    });
+
+    await expect(service.getTask(user, 'import-1')).resolves.toEqual({
+      id: 'import-1',
+      documentId: 'document-1',
+      versionId: 'version-1',
+      status: 'RUNNING',
+      stage: 'FETCHING',
+      progress: 10,
+      attempt: 1,
+      errorCode: null,
+      errorMessage: null,
+      startedAt,
+      completedAt: null,
+      createdAt,
+      updatedAt,
+    });
+    // Jest's untyped dependency mock exposes calls as any; narrow the captured query here.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const query = prisma.importTask.findUnique.mock.calls[0]?.[0] as {
+      select: Record<string, unknown>;
+    };
+    expect(query.select).not.toHaveProperty('quarantineObjectKey');
+    expect(query.select).not.toHaveProperty('requestId');
+    expect(query.select).not.toHaveProperty('traceId');
+    expect(query.select).not.toHaveProperty('createdById');
+    expect(policy.require).toHaveBeenCalledWith(user, 'space-1', 'VIEW');
+  });
 });
 
 describe('parseCreateFileImports', () => {

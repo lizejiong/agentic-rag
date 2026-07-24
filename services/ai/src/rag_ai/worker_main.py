@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 
 from rag_ai.infrastructure.redis.stream_worker import create_redis_transport
 from rag_ai.infrastructure.storage.minio_storage import create_minio_storage
@@ -79,12 +80,18 @@ async def run_worker() -> None:
         await repository.close()
 
 
+def _worker_loop_factory() -> asyncio.AbstractEventLoop:
+    if sys.platform == "win32":
+        return asyncio.SelectorEventLoop()
+    return asyncio.new_event_loop()
+
+
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    asyncio.run(run_worker())
+    asyncio.run(run_worker(), loop_factory=_worker_loop_factory)
 
 
 if __name__ == "__main__":
