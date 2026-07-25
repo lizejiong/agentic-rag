@@ -8,10 +8,13 @@ from redis.asyncio import Redis
 
 from rag_ai.memory.session_memory import RedisSessionMemoryStore
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("CI") == "true" and not os.environ.get("REDIS_URL"),
-    reason="Memory tests require a local Redis; skipped in CI without REDIS_URL",
-)
+
+@pytest.fixture
+async def redis_client() -> Redis:
+    url = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379")
+    client = Redis.from_url(url)
+    yield client
+    await client.aclose()
 
 
 @pytest.fixture
@@ -112,11 +115,3 @@ async def test_window_turns_zero_skips_persistence(
     assert updated.messages == []
     memory = await store.load(user_id, session_id)
     assert memory.messages == []
-
-
-@pytest.fixture
-async def redis_client() -> Redis:
-    """Connect to the local development Redis instance."""
-    client = Redis.from_url("redis://:atlas-local-redis@127.0.0.1:56379")
-    yield client
-    await client.aclose()
