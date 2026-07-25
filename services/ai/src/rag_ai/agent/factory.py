@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from rag_ai.agent.runner import Agent
+from rag_ai.memory.session_memory import RedisSessionMemoryStore
+from rag_ai.models.base import ChatModel, EmbeddingModel, Reranker
+from rag_ai.models.factory import create_chat_model, create_embedding_model, create_reranker
+from rag_ai.retrieval.lexical_repository import LexicalRepository
+from rag_ai.retrieval.service import RetrievalOptions, RetrievalService
+from rag_ai.retrieval.vector_repository import VectorRepository
+from rag_ai.settings import WorkerSettings
+
+
+def build_retrieval_service(
+    settings: WorkerSettings,
+    *,
+    embedding_model: EmbeddingModel | None = None,
+    reranker: Reranker | None = None,
+) -> RetrievalService:
+    engine = create_async_engine(settings.async_sqlalchemy_url, pool_pre_ping=True)
+    embedding = embedding_model or create_embedding_model(
+        provider=settings.embedding_provider,
+        dimensions=settings.embedding_dimensions,
+        version=settings.embedding_version,
+    )
+    rerank = reranker or create_reranker(
+        provider=settings.reranker_provider,
+        dimensions=settings.embedding_dimensions,
+        version=settings.reranker_version,
+    )
+    from elasticsearch import AsyncElasticsearch
+
+    lexical_repo = LexicalRepository(
+        AsyncElasticsearch(settings.elasticsearch_url),
+        settings.elasticsearch_index,
+    )
+    vector_repo = VectorRepository(
+        engine,
+        embedding.model_name,
+        embedding.version,
+    )
+    return RetrievalService(
+        vector_repo=vector_repo,
+        lexical_repo=lexical_repo,
+        embedding_model=embedding,
+        reranker=rerank,
+        options=RetrievalOptions(
+            vector_top_k=settings.retrieval_vector_top_k,
+            lexical_top_k=settings.retrieval_lexical_top_k,
+            rrf_k=settings.retrieval_rrf_k,
+            rrf_top_k=settings.retrieval_rrf_top_k,
+            rerank_top_k=settings.retrieval_rerank_top_k,
+        ),
+    )
+
+
+def build_memory_store(settings: WorkerSettings) -> RedisSessionMemoryStore:
+    return RedisSessionMemoryStore(
+        Redis.from_url(str(settings.redis_url)),
+        window_turns=settings.memory_window_turns,
+        ttl_seconds=settings.memory_ttl_seconds,
+    )
+
+
+def build_agent(
+    settings: WorkerSettings,
+    *,
+    retrieval: RetrievalService | None = None,
+    chat: ChatModel | None = None,
+) -> Agent:
+    return Agent(
+        retrieval=retrieval or build_retrieval_service(settings),
+        chat=chat or create_chat_model(provider=settings.llm_provider, version=settings.llm_version),
+    )
