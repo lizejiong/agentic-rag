@@ -8,8 +8,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from rag_ai.agent.factory import build_retrieval_service
-from rag_ai.models.base import ChatMessage
-from rag_ai.retrieval.models import AclSnapshot, SpacePolicy
 from rag_ai.routes.runs import _build_acl, _load_space_policies
 from rag_ai.settings import get_worker_settings
 
@@ -58,7 +56,7 @@ async def search_test(request: SearchTestRequest) -> SearchTestResponse:
 
     service = _get_retrieval_service()
     try:
-        summary, chunks = await service.retrieve(
+        _summary, chunks = await service.retrieve(
             query=request.query,
             space_ids=[str(sid) for sid in request.selectedSpaceIds],
             acl=acl,
