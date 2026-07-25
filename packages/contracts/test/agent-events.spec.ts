@@ -15,8 +15,10 @@ describe('agent event fixture', () => {
       .split('\n')
       .map((line) => agentEventSchema.parse(JSON.parse(line)));
 
-    expect(events.map((event) => event.seq)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(events.map((event) => event.seq)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(events.at(-1)?.type).toBe('run.completed');
+    expect(events.some((event) => event.type === 'retrieval.summary')).toBe(true);
+    expect(events.some((event) => event.type === 'run.status' && event.status === 'understanding')).toBe(true);
   });
 
   it('rejects unknown event fields', () => {
