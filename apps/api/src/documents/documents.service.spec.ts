@@ -6,6 +6,7 @@ import type { Response } from 'express';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { ObjectStorageService } from '../infrastructure/object-storage/object-storage.service';
+import { OutboxService } from '../outbox/outbox.service';
 import { SpacePolicy } from '../spaces/space-policy';
 import { DocumentsService } from './documents.service';
 
@@ -105,10 +106,12 @@ function createDependencies() {
   const storage = {
     getObject: jest.fn().mockResolvedValue(Readable.from(Buffer.from('test'))),
   };
+  const outbox = { enqueue: jest.fn().mockResolvedValue({}) };
   const service = new DocumentsService(
     prisma as unknown as PrismaService,
     policy as unknown as SpacePolicy,
     storage as unknown as ObjectStorageService,
+    outbox as unknown as OutboxService,
   );
   return { prisma, policy, storage, service };
 }

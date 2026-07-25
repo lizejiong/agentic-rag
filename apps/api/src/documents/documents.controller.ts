@@ -5,6 +5,7 @@ import {
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Post,
   Query,
   Res,
   UseGuards,
@@ -68,6 +69,15 @@ export class DocumentsController {
     @Param('documentId', ParseUUIDPipe) documentId: string,
   ) {
     return this.documents.getChunks(user, documentId);
+  }
+
+  @Post('documents/:documentId/reindex')
+  @HttpCode(200)
+  reindex(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.documents.reindex(user, documentId);
   }
 
   @Delete('documents/:documentId')

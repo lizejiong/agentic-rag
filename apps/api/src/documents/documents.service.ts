@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   ConflictException,
   Injectable,
@@ -8,6 +10,7 @@ import type { Response } from 'express';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 import { ObjectStorageService } from '../infrastructure/object-storage/object-storage.service';
+import { OutboxService } from '../outbox/outbox.service';
 import { SpacePolicy } from '../spaces/space-policy';
 
 interface NormalizedElementRow {
@@ -30,6 +33,7 @@ export class DocumentsService {
     private readonly prisma: PrismaService,
     private readonly spacePolicy: SpacePolicy,
     private readonly storage: ObjectStorageService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async list(spaceId: string, filters?: { search?: string; status?: string }) {
@@ -328,5 +332,88 @@ export class DocumentsService {
       tokenCount: row.token_count,
       location: row.location,
     }));
+  }
+
+  async reindex(user: AuthenticatedUser, documentId: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      select: {
+        availability: true,
+        spaceId: true,
+        activeVersion: {
+          select: {
+            id: true,
+            versionNumber: true,
+            sourceType: true,
+            originalFileName: true,
+            declaredMimeType: true,
+            contentHash: true,
+            sizeBytes: true,
+            storedObject: { select: { objectKey: true } },
+          },
+        },
+        aclEntries: { select: { subjectType: true, subjectId: true } },
+      },
+    });
+    if (!document || document.availability === 'SOFT_DELETED') {
+      throw new NotFoundException('DOCUMENT_NOT_FOUND');
+    }
+    await this.spacePolicy.require(user, document.spaceId, 'EDIT');
+
+    const activeVersion = document.activeVersion;
+    const objectKey = activeVersion?.storedObject?.objectKey;
+    if (!objectKey) {
+      throw new ConflictException('DOCUMENT_NO_STORED_FILE');
+    }
+
+    const importId = randomUUID();
+    const traceId = randomUUID();
+
+    return this.prisma.$transaction(async (transaction) => {
+      const importTask = await transaction.importTask.create({
+        data: {
+          id: importId,
+          documentId,
+          versionId: activeVersion.id,
+          status: 'QUEUED',
+          stage: 'QUEUED',
+          progress: 5,
+          requestId: importId,
+          traceId,
+          createdById: user.id,
+        },
+      });
+
+      await transaction.documentVersion.update({
+        where: { id: activeVersion.id },
+        data: { processingStatus: 'QUEUED', errorCode: null, errorMessage: null },
+      });
+
+      await this.outbox.enqueue(transaction, {
+        type: 'document.ingestion.requested.v1',
+        taskId: importTask.id,
+        resourceId: activeVersion.id,
+        resourceVersion: activeVersion.versionNumber,
+        traceId,
+        payload: {
+          documentId,
+          spaceId: document.spaceId,
+          versionId: activeVersion.id,
+          importId: importTask.id,
+          objectKey,
+          contentHash: activeVersion.contentHash ?? '',
+          sizeBytes: activeVersion.sizeBytes ?? 0,
+          declaredMimeType: activeVersion.declaredMimeType,
+          originalFileName: activeVersion.originalFileName,
+          actorId: user.id,
+          aclSnapshot: {
+            spaceId: document.spaceId,
+            documentSubjects: document.aclEntries,
+          },
+        },
+      });
+
+      return { documentId, importId: importTask.id, status: 'QUEUED' };
+    });
   }
 }
