@@ -380,6 +380,39 @@ export class DocumentImportService {
     }
   }
 
+  async retry(user: AuthenticatedUser, importId: string) {
+    const task = await this.prisma.importTask.findUnique({
+      where: { id: importId },
+      include: { document: { select: { spaceId: true } } },
+    });
+    if (!task) {
+      throw new NotFoundException('IMPORT_TASK_NOT_FOUND');
+    }
+    await this.spacePolicy.require(user, task.document.spaceId, 'EDIT');
+    if (task.status !== 'FAILED') {
+      throw new ConflictException('IMPORT_NOT_FAILED');
+    }
+
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.documentVersion.update({
+        where: { id: task.versionId },
+        data: { processingStatus: 'PENDING_UPLOAD', errorCode: null, errorMessage: null },
+      });
+      return transaction.importTask.update({
+        where: { id: task.id },
+        data: {
+          status: 'PENDING_UPLOAD',
+          stage: 'PENDING_UPLOAD',
+          progress: 0,
+          errorCode: null,
+          errorMessage: null,
+          startedAt: null,
+          completedAt: null,
+        },
+      });
+    });
+  }
+
   async cancel(user: AuthenticatedUser, importId: string) {
     const task = await this.prisma.importTask.findUnique({
       where: { id: importId },

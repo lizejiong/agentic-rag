@@ -93,4 +93,13 @@ export class DocumentImportController {
   ) {
     return this.imports.cancel(user, importId);
   }
+
+  @Post('imports/:importId/retry')
+  @HttpCode(200)
+  retry(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('importId', ParseUUIDPipe) importId: string,
+  ) {
+    return this.imports.retry(user, importId);
+  }
 }
