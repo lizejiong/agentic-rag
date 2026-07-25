@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import os
 from uuid import UUID, uuid4
 
 import pytest
 from redis.asyncio import Redis
 
 from rag_ai.memory.session_memory import RedisSessionMemoryStore
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("CI") == "true" and not os.environ.get("REDIS_URL"),
+    reason="Memory tests require a local Redis; skipped in CI without REDIS_URL",
+)
 
 
 @pytest.fixture
