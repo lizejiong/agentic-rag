@@ -5,6 +5,7 @@ export const visibleSpaceSchema = z.object({
   name: z.string(),
   description: z.string().nullable(),
   effectivePermission: z.enum(['VIEW', 'EDIT', 'MANAGE']),
+  documentCount: z.number().int().nonnegative(),
 });
 
 export const visibleSpacesSchema = z.array(visibleSpaceSchema);
