@@ -5,8 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 from redis.asyncio import Redis
 
-from rag_ai.memory.session_memory import RedisSessionMemoryStore, SessionMemory
-from rag_ai.models.base import ChatMessage
+from rag_ai.memory.session_memory import RedisSessionMemoryStore
 
 
 @pytest.fixture
