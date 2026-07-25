@@ -19,5 +19,7 @@ __pycache__/
 **/.mypy_cache/
 **/.ruff_cache/
 *.log
+.smoke-logs/
+.pytest-phase2/
 .playwright-cli/
 output/playwright/
