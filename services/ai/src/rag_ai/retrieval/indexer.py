@@ -43,6 +43,7 @@ class ChunkIndexer:
         without re-running parsing.
         """
         await self.index_chunks(
+            document_id=command.payload.document_id,
             version_id=command.payload.version_id,
             space_id=command.payload.space_id,
             title=result.document.title,
@@ -53,6 +54,7 @@ class ChunkIndexer:
     async def index_chunks(
         self,
         *,
+        document_id: UUID,
         version_id: UUID,
         space_id: UUID,
         title: str,
@@ -157,7 +159,7 @@ class ChunkIndexer:
             location = _parse_location(row["location"])
             chunk = RetrievedChunk(
                 chunk_id=row["id"],
-                document_id=UUID(int=0),  # Not needed for ES index.
+                document_id=document_id,
                 version_id=version_id,
                 space_id=space_id,
                 content=row["content"],

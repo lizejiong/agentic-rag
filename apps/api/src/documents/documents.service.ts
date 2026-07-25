@@ -277,6 +277,12 @@ export class DocumentsService {
       });
 
       for (const versionId of versionIds) {
+        // Mark chunks as non-searchable before deletion so retrieval
+        // (both vector and lexical paths) excludes them immediately.
+        await transaction.$executeRaw`
+          UPDATE rag.chunks SET is_searchable = false
+          WHERE version_id = ${versionId}::uuid
+        `;
         await transaction.$executeRaw`
           DELETE FROM rag.chunk_embeddings
           WHERE chunk_id IN (SELECT id FROM rag.chunks WHERE version_id = ${versionId}::uuid)
