@@ -56,18 +56,17 @@ async def search_test(request: SearchTestRequest) -> SearchTestResponse:
 
     service = _get_retrieval_service()
     try:
-        _summary, chunks = await service.retrieve(
+        chunks, _summary = await service.retrieve(
             query=request.query,
-            space_ids=[str(sid) for sid in request.selectedSpaceIds],
+            space_ids=request.selectedSpaceIds,
             acl=acl,
             policies=policies,
-            top_k=request.maxResults,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Retrieval failed") from exc
 
     results: list[SearchTestChunk] = []
-    for chunk in chunks:
+    for chunk in chunks[: request.maxResults]:
         location = None
         if chunk.location:
             location = {

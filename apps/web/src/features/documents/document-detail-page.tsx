@@ -78,6 +78,7 @@ export function DocumentDetailPage() {
   };
 
   const handleDelete = async () => {
+    if (!window.confirm('确定要删除此文档吗？删除后可从回收站恢复。')) return;
     const spaceId = document.data!.spaceId;
     setDeleting(true);
     try {

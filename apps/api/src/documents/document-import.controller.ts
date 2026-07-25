@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 import {
   BadRequestException,
   Body,
@@ -21,7 +19,11 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireSpacePermission } from '../authorization/require-permission.decorator';
 import { SpacePermissionGuard } from '../authorization/space-permission.guard';
 import { DocumentImportService } from './document-import.service';
-import { parseCreateFileImports, parseCreateUrlImport } from './document-import.validation';
+import {
+  parseCreateFileImports,
+  parseCreateUrlImport,
+  parseReplaceFile,
+} from './document-import.validation';
 
 @Controller()
 @UseGuards(AccessTokenGuard)
@@ -111,18 +113,6 @@ export class DocumentImportController {
     @Param('documentId', ParseUUIDPipe) documentId: string,
     @Body() input: unknown,
   ) {
-    const parsed = z
-      .object({
-        fileName: z.string().min(1).max(255),
-        sizeBytes: z
-          .number()
-          .int()
-          .positive()
-          .max(200 * 1024 * 1024),
-        mimeType: z.string().min(1).max(160),
-      })
-      .strict()
-      .parse(input);
-    return this.imports.replaceFile(user, documentId, parsed);
+    return this.imports.replaceFile(user, documentId, parseReplaceFile(input));
   }
 }
