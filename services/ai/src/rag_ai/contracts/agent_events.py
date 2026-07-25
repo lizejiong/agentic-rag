@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated, Literal, TypeAlias
+from typing import Annotated, Any, Literal, TypeAlias
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -50,9 +50,24 @@ class CitationLocation(StrictModel):
 class Citation(EventBase):
     type: Literal["citation"]
     citationId: UUID
+    chunkId: UUID
+    documentId: UUID
     title: str = Field(min_length=1)
     snippet: str
     location: CitationLocation
+
+
+class RetrievalPathSummary(StrictModel):
+    path: Literal["vector", "lexical"]
+    spaceId: str = Field(min_length=1)
+    candidatesReturned: int = Field(ge=0)
+    candidatesAfterAcl: int | None = Field(default=None, ge=0)
+    error: str | None = Field(default=None)
+
+
+class RetrievalSummary(EventBase):
+    type: Literal["retrieval.summary"]
+    summary: dict[str, Any]
 
 
 class RunCompleted(EventBase):
@@ -68,7 +83,13 @@ class RunFailed(EventBase):
 
 
 AgentEvent: TypeAlias = Annotated[
-    RunStarted | RunStatus | TextDelta | Citation | RunCompleted | RunFailed,
+    RunStarted
+    | RunStatus
+    | TextDelta
+    | Citation
+    | RetrievalSummary
+    | RunCompleted
+    | RunFailed,
     Field(discriminator="type"),
 ]
 
@@ -79,8 +100,24 @@ class RunRequest(StrictModel):
     actorId: str = Field(min_length=1)
     question: str = Field(min_length=1, max_length=8000)
     selectedSpaceIds: list[UUID] = Field(max_length=20)
+    aclSnapshot: dict[str, Any] = Field(default_factory=dict)
+    sessionId: str | None = Field(default=None, max_length=120)
 
     @field_validator("question", mode="before")
     @classmethod
     def strip_question(cls, value: object) -> object:
         return value.strip() if isinstance(value, str) else value
+
+    @field_validator("aclSnapshot", mode="before")
+    @classmethod
+    def default_acl_snapshot(cls, value: object) -> object:
+        return value if isinstance(value, dict) else {}
+
+
+class ChatHistoryMessage(StrictModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1)
+
+
+class ChatRequest(RunRequest):
+    history: list[ChatHistoryMessage] = Field(default_factory=list)
