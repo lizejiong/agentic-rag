@@ -19,10 +19,7 @@ export class SearchTestController {
   constructor(private readonly authorization: AuthorizationService) {}
 
   @Post()
-  async test(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() input: unknown,
-  ) {
+  async test(@CurrentUser() user: AuthenticatedUser, @Body() input: unknown) {
     const parsed = searchTestRequestSchema.parse(input);
 
     // Verify VIEW on all requested spaces
@@ -53,6 +50,6 @@ export class SearchTestController {
       throw new Error(`AI service search test failed: ${response.status} ${detail}`);
     }
 
-    return response.json();
+    return response.json() as Promise<unknown>;
   }
 }

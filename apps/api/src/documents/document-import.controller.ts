@@ -114,7 +114,11 @@ export class DocumentImportController {
     const parsed = z
       .object({
         fileName: z.string().min(1).max(255),
-        sizeBytes: z.number().int().positive().max(200 * 1024 * 1024),
+        sizeBytes: z
+          .number()
+          .int()
+          .positive()
+          .max(200 * 1024 * 1024),
         mimeType: z.string().min(1).max(160),
       })
       .strict()

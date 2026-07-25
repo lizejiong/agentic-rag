@@ -1,10 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Response } from 'express';
 
 import type { AuthenticatedUser } from '../auth/auth.types';

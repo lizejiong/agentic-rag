@@ -132,6 +132,7 @@ describe('DocumentsService.get()', () => {
     const { prisma, service } = createDependencies();
     await service.get(user, 'document-1');
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const query = prisma.document.findUnique.mock.calls[0]?.[0] as {
       select: Record<string, unknown>;
     };
