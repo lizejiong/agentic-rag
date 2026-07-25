@@ -1,4 +1,14 @@
-import { Controller, Get, Param, ParseUUIDPipe, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import type { Response } from 'express';
 
 import { AccessTokenGuard } from '../auth/access-token.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -25,5 +35,31 @@ export class DocumentsController {
     @Param('documentId', ParseUUIDPipe) documentId: string,
   ) {
     return this.documents.get(user, documentId);
+  }
+
+  @Get('documents/:documentId/download')
+  async download(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Res() response: Response,
+  ) {
+    await this.documents.download(user, documentId, response);
+  }
+
+  @Get('documents/:documentId/content')
+  getContent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.documents.getContent(user, documentId);
+  }
+
+  @Delete('documents/:documentId')
+  @HttpCode(200)
+  async delete(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.documents.delete(user, documentId);
   }
 }

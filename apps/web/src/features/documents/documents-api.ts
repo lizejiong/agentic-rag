@@ -5,6 +5,7 @@ import { createRequestHeaders, requestJson } from '../../shared/api/request-json
 import {
   createFileImportsResponseSchema,
   createUrlImportResponseSchema,
+  documentDetailSchema,
   documentListSchema,
   importTaskSchema,
   type UploadTicket,
@@ -28,6 +29,15 @@ export function listDocuments(fetcher: Fetcher, spaceId: string, signal?: AbortS
   return requestJson({
     schema: documentListSchema,
     input: `/api/spaces/${spaceId}/documents`,
+    init: signal ? { signal } : {},
+    fetcher,
+  });
+}
+
+export function getDocument(fetcher: Fetcher, documentId: string, signal?: AbortSignal) {
+  return requestJson({
+    schema: documentDetailSchema,
+    input: `/api/documents/${documentId}`,
     init: signal ? { signal } : {},
     fetcher,
   });
@@ -133,3 +143,53 @@ export function uploadFile(
 }
 
 export const uploadResponseSchema = z.object({ status: z.literal('QUEUED') });
+
+const documentContentSchema = z.object({
+  documentId: z.string().uuid(),
+  title: z.string(),
+  elementCount: z.int().nonnegative(),
+  fullText: z.string(),
+});
+
+export type DocumentContent = z.infer<typeof documentContentSchema>;
+
+export function getDocumentContent(
+  fetcher: Fetcher,
+  documentId: string,
+  signal?: AbortSignal,
+) {
+  return requestJson({
+    schema: documentContentSchema,
+    input: `/api/documents/${documentId}/content`,
+    init: signal ? { signal } : {},
+    fetcher,
+  });
+}
+
+export async function deleteDocument(fetcher: Fetcher, documentId: string): Promise<void> {
+  const response = await fetcher(`/api/documents/${documentId}`, {
+    method: 'DELETE',
+    headers: createRequestHeaders(),
+  });
+  if (!response.ok) throw new Error(`DELETE_HTTP_${response.status}`);
+}
+
+export async function downloadDocument(
+  fetcher: Fetcher,
+  documentId: string,
+  fileName: string,
+): Promise<void> {
+  const response = await fetcher(`/api/documents/${documentId}/download`, {
+    headers: createRequestHeaders(),
+  });
+  if (!response.ok) throw new Error(`DOWNLOAD_HTTP_${response.status}`);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
