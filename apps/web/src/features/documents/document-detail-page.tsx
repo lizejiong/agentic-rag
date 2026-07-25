@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { useAuth } from '../auth/auth-provider';
@@ -7,6 +7,9 @@ import {
   downloadDocument,
   getDocumentChunks,
   getDocumentContent,
+  replaceFile,
+  uploadFile,
+  waitForImport,
   type DocumentChunk,
   type DocumentContent,
 } from './documents-api';
@@ -46,6 +49,8 @@ export function DocumentDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [chunks, setChunks] = useState<DocumentChunk[] | null>(null);
   const [chunksLoading, setChunksLoading] = useState(false);
+  const replaceInput = useRef<HTMLInputElement>(null);
+  const [replacing, setReplacing] = useState(false);
 
   const handleLoadChunks = async () => {
     setChunksLoading(true);
@@ -83,6 +88,33 @@ export function DocumentDetailPage() {
         error instanceof Error ? error.message : 'DOCUMENT_DELETE_FAILED',
       );
       setDeleting(false);
+    }
+  };
+
+  const handleReplace = async (file: File) => {
+    setReplacing(true);
+    try {
+      const ticket = await replaceFile(auth.authorizedFetch, documentId, {
+        fileName: file.name,
+        sizeBytes: file.size,
+        mimeType: file.type || 'application/octet-stream',
+      });
+      const token = auth.getAccessToken() ?? (await auth.refreshAccessToken());
+      if (!token) throw new Error('AUTH_SESSION_EXPIRED');
+      await uploadFile(
+        { clientFileId: crypto.randomUUID(), ...ticket },
+        file,
+        token,
+        () => {},
+      );
+      await waitForImport(auth.authorizedFetch, ticket.importId);
+      document.refetch();
+    } catch (error: unknown) {
+      setContentError(
+        error instanceof Error ? error.message : 'FILE_REPLACE_FAILED',
+      );
+    } finally {
+      setReplacing(false);
     }
   };
 
@@ -212,6 +244,24 @@ export function DocumentDetailPage() {
               onClick={() => void handleDownload()}
             >
               下载原文件
+            </button>
+            <input
+              ref={replaceInput}
+              className="visually-hidden"
+              type="file"
+              accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.csv,.json"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleReplace(file);
+              }}
+            />
+            <button
+              type="button"
+              className="document-action-btn document-action-btn--download"
+              disabled={replacing}
+              onClick={() => replaceInput.current?.click()}
+            >
+              {replacing ? '替换中…' : '替换文件'}
             </button>
             <button
               type="button"

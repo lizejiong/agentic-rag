@@ -173,6 +173,75 @@ export class DocumentImportService {
     });
   }
 
+  async replaceFile(
+    user: AuthenticatedUser,
+    documentId: string,
+    file: { fileName: string; sizeBytes: number; mimeType: string },
+  ): Promise<{ documentId: string; versionId: string; importId: string; uploadPath: string }> {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      include: {
+        versions: { orderBy: { versionNumber: 'desc' }, take: 1 },
+        importTasks: {
+          where: { status: { in: ['PENDING_UPLOAD', 'QUEUED', 'RUNNING'] } },
+          take: 1,
+        },
+      },
+    });
+    if (!document || document.availability === 'SOFT_DELETED') {
+      throw new NotFoundException('DOCUMENT_NOT_FOUND');
+    }
+    if (document.sourceType !== 'FILE') {
+      throw new ConflictException('DOCUMENT_IS_NOT_FILE');
+    }
+    await this.spacePolicy.require(user, document.spaceId, 'EDIT');
+    if (document.importTasks.length > 0) {
+      throw new ConflictException('IMPORT_IN_PROGRESS');
+    }
+
+    const { extension } = validateImportFile(file.fileName, file.sizeBytes);
+    const latest = document.versions[0];
+    const title = basename(file.fileName, extname(file.fileName)).trim() || file.fileName;
+    const context = this.context.get();
+    const requestId = context?.requestId ?? randomUUID();
+    const traceId = context?.traceId ?? requestId;
+
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.document.update({
+        where: { id: documentId },
+        data: { title },
+      });
+      const version = await transaction.documentVersion.create({
+        data: {
+          documentId,
+          versionNumber: (latest?.versionNumber ?? 0) + 1,
+          sourceType: 'FILE',
+          originalFileName: file.fileName,
+          fileExtension: extension,
+          declaredMimeType: file.mimeType,
+          sizeBytes: file.sizeBytes,
+          createdById: user.id,
+        },
+      });
+      const importTask = await transaction.importTask.create({
+        data: {
+          documentId,
+          versionId: version.id,
+          status: 'PENDING_UPLOAD',
+          requestId,
+          traceId,
+          createdById: user.id,
+        },
+      });
+      return {
+        documentId,
+        versionId: version.id,
+        importId: importTask.id,
+        uploadPath: `/imports/${importTask.id}/content`,
+      };
+    });
+  }
+
   async refreshUrl(user: AuthenticatedUser, documentId: string): Promise<CreateUrlImportResponse> {
     const document = await this.prisma.document.findUnique({
       where: { id: documentId },

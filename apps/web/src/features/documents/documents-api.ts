@@ -200,6 +200,30 @@ export function getDocumentChunks(
   });
 }
 
+const replaceFileResponseSchema = z.object({
+  documentId: z.string().uuid(),
+  versionId: z.string().uuid(),
+  importId: z.string().uuid(),
+  uploadPath: z.string(),
+});
+
+export function replaceFile(
+  fetcher: Fetcher,
+  documentId: string,
+  file: { fileName: string; sizeBytes: number; mimeType: string },
+) {
+  return requestJson({
+    schema: replaceFileResponseSchema,
+    input: `/api/documents/${documentId}/replace-file`,
+    init: {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(file),
+    },
+    fetcher,
+  });
+}
+
 export async function deleteDocument(fetcher: Fetcher, documentId: string): Promise<void> {
   const response = await fetcher(`/api/documents/${documentId}`, {
     method: 'DELETE',

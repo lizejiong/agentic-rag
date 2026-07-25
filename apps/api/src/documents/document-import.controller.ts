@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import {
   BadRequestException,
   Body,
@@ -101,5 +103,22 @@ export class DocumentImportController {
     @Param('importId', ParseUUIDPipe) importId: string,
   ) {
     return this.imports.retry(user, importId);
+  }
+
+  @Post('documents/:documentId/replace-file')
+  replaceFile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Body() input: unknown,
+  ) {
+    const parsed = z
+      .object({
+        fileName: z.string().min(1).max(255),
+        sizeBytes: z.number().int().positive().max(200 * 1024 * 1024),
+        mimeType: z.string().min(1).max(160),
+      })
+      .strict()
+      .parse(input);
+    return this.imports.replaceFile(user, documentId, parsed);
   }
 }
