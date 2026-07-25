@@ -111,7 +111,7 @@ async def run_agent(request: ChatRequest) -> StreamingResponse:
     session_memory = None
     if request.sessionId:
         try:
-            session_memory = await memory_store.load(request.actorId, request.sessionId)
+            session_memory = await memory_store.load(UUID(request.actorId), request.sessionId)
         except Exception:
             # Memory is best-effort; do not fail the run.
             session_memory = None
@@ -152,7 +152,7 @@ async def run_agent(request: ChatRequest) -> StreamingResponse:
                 try:
                     answer_text = "".join(answer_parts)
                     await memory_store.append_turn(
-                        user_id=request.actorId,
+                        user_id=UUID(request.actorId),
                         session_id=request.sessionId,
                         user_message=request.question,
                         assistant_message=answer_text,

@@ -13,10 +13,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 function formatLocation(location: {
-  page?: number;
-  slide?: number;
-  sheet?: string;
-  cellRange?: string;
+  page?: number | undefined;
+  slide?: number | undefined;
+  sheet?: string | undefined;
+  cellRange?: string | undefined;
 }): string | undefined {
   if (location.page) return `第 ${location.page} 页`;
   if (location.slide) return `第 ${location.slide} 页幻灯片`;

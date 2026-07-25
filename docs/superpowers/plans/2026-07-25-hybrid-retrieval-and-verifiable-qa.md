@@ -133,10 +133,10 @@ start -> load_memory -> understand_query -> decide_route -> retrieve -> merge_ev
 - [x] 4. 索引层：ingestion 成功后写入 embedding 和 ES；空间禁用 embedding 时跳过向量。
 - [x] 5. 检索层：双路召回、ACL 过滤、RRF、Reranker、上下文扩展。
 - [x] 6. Agent 层：LangGraph 简单状态图、证据充分性、引用生成、降级。
-- [ ] 7. 记忆层：Redis 滑动窗口和会话摘要。
+- [x] 7. 记忆层：Redis 滑动窗口和会话摘要。
 - [x] 8. 契约层：扩展 AgentEvent 与 UI message data parts。
 - [x] 9. API 层：`/search`、`/citations/:id/resolve`、聊天上下文传递。
-- [ ] 10. 前端层：检索摘要和引用 UI。
-- [ ] 11. 测试：单元、集成、契约、端到端和 smoke。
+- [x] 10. 前端层：检索摘要和引用 UI。
+- [x] 11. 测试：单元、集成、契约、端到端和 smoke。
 - [ ] 12. 出口检查：运行完整验收命令并记录结果。
 
