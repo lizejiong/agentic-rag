@@ -108,6 +108,7 @@ export function DocumentListPage() {
                   <p>
                     v{document.latestVersion?.versionNumber ?? 1} ·{' '}
                     {document.latestVersion?.processingStatus ?? 'PENDING_UPLOAD'}
+                    {document.createdBy ? ` · ${document.createdBy.username}` : ''}
                   </p>
                 </div>
                 <div className="document-status">

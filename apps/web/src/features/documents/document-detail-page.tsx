@@ -180,6 +180,12 @@ export function DocumentDetailPage() {
               <dt className="meta-label">状态</dt>
               <dd>{doc.availability}</dd>
             </div>
+            {doc.createdBy ? (
+              <div>
+                <dt className="meta-label">上传人</dt>
+                <dd>{doc.createdBy.username}</dd>
+              </div>
+            ) : null}
             <div>
               <dt className="meta-label">创建时间</dt>
               <dd>{new Date(doc.createdAt).toLocaleString('zh-CN')}</dd>

@@ -54,6 +54,7 @@ export class DocumentsService {
         sourceType: true,
         availability: true,
         activeVersionId: true,
+        createdBy: { select: { id: true, username: true } },
         createdAt: true,
         updatedAt: true,
         versions: {
@@ -122,6 +123,7 @@ export class DocumentsService {
         sourceType: true,
         availability: true,
         activeVersionId: true,
+        createdBy: { select: { id: true, username: true } },
         createdAt: true,
         updatedAt: true,
         versions: {

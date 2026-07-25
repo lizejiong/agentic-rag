@@ -146,6 +146,13 @@ export const importTaskSchema = z
   })
   .strict();
 
+export const createdBySchema = z
+  .object({
+    id: z.string().uuid(),
+    username: z.string(),
+  })
+  .strict();
+
 export const documentSummarySchema = z
   .object({
     id: z.string().uuid(),
@@ -156,6 +163,23 @@ export const documentSummarySchema = z
     activeVersionId: z.string().uuid().nullable(),
     latestVersion: documentVersionSchema.nullable(),
     latestImport: importTaskSchema.nullable(),
+    createdBy: createdBySchema.nullable(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+  })
+  .strict();
+
+export const documentDetailSchema = z
+  .object({
+    id: z.string().uuid(),
+    spaceId: z.string().uuid(),
+    title: z.string().min(1),
+    sourceType: documentSourceTypeSchema,
+    availability: documentAvailabilitySchema,
+    activeVersionId: z.string().uuid().nullable(),
+    versions: z.array(documentVersionSchema),
+    importTasks: z.array(importTaskSchema),
+    createdBy: createdBySchema.nullable(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
   })
@@ -249,6 +273,7 @@ export type CreateFileImportsResponse = z.infer<typeof createFileImportsResponse
 export type CreateUrlImport = z.infer<typeof createUrlImportSchema>;
 export type CreateUrlImportResponse = z.infer<typeof createUrlImportResponseSchema>;
 export type DocumentSummary = z.infer<typeof documentSummarySchema>;
+export type DocumentDetail = z.infer<typeof documentDetailSchema>;
 export type DocumentVersion = z.infer<typeof documentVersionSchema>;
 export type ImportTask = z.infer<typeof importTaskSchema>;
 export type DocumentIngestionRequestedPayload = z.infer<
