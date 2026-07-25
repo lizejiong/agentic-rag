@@ -19,7 +19,11 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { RequireSpacePermission } from '../authorization/require-permission.decorator';
 import { SpacePermissionGuard } from '../authorization/space-permission.guard';
 import { DocumentImportService } from './document-import.service';
-import { parseCreateFileImports, parseCreateUrlImport } from './document-import.validation';
+import {
+  parseCreateFileImports,
+  parseCreateUrlImport,
+  parseReplaceFile,
+} from './document-import.validation';
 
 @Controller()
 @UseGuards(AccessTokenGuard)
@@ -92,5 +96,23 @@ export class DocumentImportController {
     @Param('importId', ParseUUIDPipe) importId: string,
   ) {
     return this.imports.cancel(user, importId);
+  }
+
+  @Post('imports/:importId/retry')
+  @HttpCode(200)
+  retry(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('importId', ParseUUIDPipe) importId: string,
+  ) {
+    return this.imports.retry(user, importId);
+  }
+
+  @Post('documents/:documentId/replace-file')
+  replaceFile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Body() input: unknown,
+  ) {
+    return this.imports.replaceFile(user, documentId, parseReplaceFile(input));
   }
 }

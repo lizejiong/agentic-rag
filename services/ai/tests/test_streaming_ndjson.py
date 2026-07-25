@@ -49,6 +49,8 @@ def test_encode_ndjson_omits_unset_citation_location_fields() -> None:
         occurredAt=datetime(2026, 7, 18, tzinfo=UTC),
         type="citation",
         citationId=UUID("00000000-0000-4000-8000-000000000002"),
+        chunkId=UUID("00000000-0000-4000-8000-000000000003"),
+        documentId=UUID("00000000-0000-4000-8000-000000000004"),
         title="协议示例文档",
         snippet="仅用于测试。",
         location=CitationLocation(page=1),

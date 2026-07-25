@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv sync *)",
+      "Bash(pnpm infra:check)",
+      "Bash(pnpm db:migrate:rag)",
+      "Bash(pnpm --filter @rag/api test -- --testPathPattern=\"\\(ai-stream|citations|search|chat.controller\\)\" --runInBand)",
+      "Read(//c/Users/lzj/.claude/projects/c--Users-lzj-Documents-rag/memory/**)",
+      "Bash(pnpm --filter @rag/api test -- --testPathPattern=\"ai-stream|citations|search|chat.controller\" --runInBand)",
+      "Bash(pnpm --filter @rag/web test -- message-part.spec.tsx)",
+      "Bash(pnpm --filter @rag/api test -- --testPathPattern=\"\\(ai-stream|citations|search|chat.controller|document-import\\)\" --runInBand)",
+      "Bash(npx jest *)",
+      "Bash(pnpm --filter @rag/api test -- chat.controller.spec.ts --runInBand)",
+      "Bash(pnpm --filter @rag/contracts typecheck)",
+      "Bash(pnpm --filter @rag/web typecheck)",
+      "Bash(pnpm --filter @rag/api lint)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\lzj\\.claude\\projects\\c--Users-lzj-Documents-rag\\memory"
+    ]
+  }
+}

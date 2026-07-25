@@ -37,12 +37,22 @@ export class AiStreamMapper {
           delta: event.text,
         });
         return;
+      case 'retrieval.summary':
+        this.writeChunk({
+          type: 'data-retrieval-summary',
+          id: `retrieval-${event.requestId}`,
+          data: event.summary,
+          transient: true,
+        });
+        return;
       case 'citation':
         this.writeChunk({
           type: 'data-citation',
           id: event.citationId,
           data: {
             citationId: event.citationId,
+            chunkId: event.chunkId,
+            documentId: event.documentId,
             title: event.title,
             snippet: event.snippet,
             location: event.location,

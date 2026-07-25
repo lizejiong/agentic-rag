@@ -1,7 +1,9 @@
-import type { AgentEvent, RunRequest } from '@rag/contracts';
+import type { AgentEvent, ChatRequest } from '@rag/contracts';
+
+export type RunRequestInput = ChatRequest;
 
 export interface AiEventSource {
-  run(request: RunRequest, signal: AbortSignal): AsyncIterable<AgentEvent>;
+  run(request: RunRequestInput, signal: AbortSignal): AsyncIterable<AgentEvent>;
   cancel(requestId: string): Promise<void>;
 }
 

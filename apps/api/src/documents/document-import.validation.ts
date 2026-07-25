@@ -1,6 +1,7 @@
 import { extname } from 'node:path';
 
 import { BadRequestException } from '@nestjs/common';
+import { z } from 'zod';
 import {
   createFileImportsSchema,
   createUrlImportSchema,
@@ -10,6 +11,28 @@ import {
 } from '@rag/contracts';
 
 const MEBIBYTE = 1024 * 1024;
+
+export const replaceFileSchema = z
+  .object({
+    fileName: z.string().min(1).max(255),
+    sizeBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(200 * MEBIBYTE),
+    mimeType: z.string().min(1).max(160),
+  })
+  .strict();
+
+export type ReplaceFileInput = z.infer<typeof replaceFileSchema>;
+
+export function parseReplaceFile(input: unknown): ReplaceFileInput {
+  const result = replaceFileSchema.safeParse(input);
+  if (!result.success) {
+    throw new BadRequestException('INVALID_REPLACE_FILE_REQUEST');
+  }
+  return result.data;
+}
 const TEXT_EXTENSIONS = new Set(['txt', 'md', 'csv', 'json']);
 
 export function parseCreateFileImports(input: unknown): CreateFileImports {

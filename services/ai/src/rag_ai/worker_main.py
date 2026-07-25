@@ -4,6 +4,8 @@ import asyncio
 import logging
 import sys
 
+from elasticsearch import AsyncElasticsearch
+
 from rag_ai.infrastructure.redis.stream_worker import create_redis_transport
 from rag_ai.infrastructure.storage.minio_storage import create_minio_storage
 from rag_ai.ingestion.chunking.structure_chunker import StructureChunker
@@ -18,6 +20,9 @@ from rag_ai.ingestion.worker import (
     WorkerOutboxPublisher,
     WorkerRuntime,
 )
+from rag_ai.models.factory import create_embedding_model
+from rag_ai.retrieval.indexer import ChunkIndexer as ConcreteChunkIndexer
+from rag_ai.retrieval.lexical_repository import LexicalRepository
 from rag_ai.settings import get_worker_settings
 
 
@@ -36,6 +41,20 @@ async def run_worker() -> None:
         settings.minio_secret_key,
         settings.minio_use_ssl,
         settings.minio_quarantine_bucket,
+    )
+    embedding_model = create_embedding_model(
+        provider=settings.embedding_provider,
+        dimensions=settings.embedding_dimensions,
+        version=settings.embedding_version,
+    )
+    lexical_repo = LexicalRepository(
+        AsyncElasticsearch(settings.elasticsearch_url),
+        settings.elasticsearch_index,
+    )
+    indexer = ConcreteChunkIndexer(
+        engine=repository._engine,
+        embedding_model=embedding_model,
+        lexical_repo=lexical_repo,
     )
     pipeline = IngestionPipeline(
         storage=storage,
@@ -63,6 +82,7 @@ async def run_worker() -> None:
         transport,
         repository,
         pipeline,
+        indexer=indexer,
         dead_letter_stream=settings.event_dead_letter_stream,
         batch_size=settings.worker_batch_size,
         block_milliseconds=settings.worker_block_milliseconds,
@@ -78,6 +98,7 @@ async def run_worker() -> None:
     finally:
         await transport.close()
         await repository.close()
+        await lexical_repo._client.close()
 
 
 def _worker_loop_factory() -> asyncio.AbstractEventLoop:

@@ -6,6 +6,8 @@ import { LoginPage } from '../features/auth/login-page';
 import { useAuth } from '../features/auth/auth-provider';
 import { ChatPage } from '../features/chat/chat-page';
 import { DocumentListPage } from '../features/documents/document-list-page';
+import { DocumentDetailPage } from '../features/documents/document-detail-page';
+import { SearchTestPage } from '../features/search/search-test-page';
 
 export function AppRouter() {
   return (
@@ -33,6 +35,22 @@ export function AppRouter() {
           element={
             <RequireAuthentication>
               <DocumentListPage />
+            </RequireAuthentication>
+          }
+        />
+        <Route
+          path="/documents/:documentId"
+          element={
+            <RequireAuthentication>
+              <DocumentDetailPage />
+            </RequireAuthentication>
+          }
+        />
+        <Route
+          path="/search-test"
+          element={
+            <RequireAuthentication>
+              <SearchTestPage />
             </RequireAuthentication>
           }
         />

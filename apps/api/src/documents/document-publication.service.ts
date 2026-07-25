@@ -53,7 +53,10 @@ export class DocumentPublicationService {
     const payload = documentIngestionCompletedPayloadSchema.parse(payloadValue);
     const task = await transaction.importTask.findUnique({
       where: { id: payload.importId },
-      include: { version: true, document: { select: { id: true } } },
+      include: {
+        version: true,
+        document: { select: { id: true, activeVersionId: true } },
+      },
     });
     if (
       !task ||
@@ -87,6 +90,8 @@ export class DocumentPublicationService {
       update: {},
       select: { id: true },
     });
+    const previousVersionId = task.document.activeVersionId;
+
     const attached = await transaction.documentVersion.updateMany({
       where: { id: payload.versionId, documentId: payload.documentId, storedObjectId: null },
       data: {
@@ -109,6 +114,14 @@ export class DocumentPublicationService {
       where: { id: payload.documentId },
       data: { activeVersionId: payload.versionId, availability: 'ACTIVE' },
     });
+
+    // Mark old version chunks as non-searchable so retrieval excludes them.
+    if (previousVersionId && previousVersionId !== payload.versionId) {
+      await transaction.$executeRaw`
+        UPDATE rag.chunks SET is_searchable = false
+        WHERE version_id = ${previousVersionId}::uuid
+      `;
+    }
     await transaction.importTask.update({
       where: { id: payload.importId },
       data: {

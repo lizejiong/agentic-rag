@@ -28,11 +28,19 @@ export class SpacePolicy {
     const spaces = await this.prisma.knowledgeSpace.findMany({
       where: { id: { in: Object.keys(snapshot.spaces) } },
       orderBy: { name: 'asc' },
+      include: {
+        _count: {
+          select: {
+            documents: { where: { availability: { not: 'SOFT_DELETED' } } },
+          },
+        },
+      },
     });
     return spaces
       .filter((space) => snapshot.admin || space.status === 'ACTIVE')
-      .map((space) => ({
+      .map(({ _count, ...space }) => ({
         ...space,
+        documentCount: _count.documents,
         effectivePermission: snapshot.spaces[space.id] as SpacePermission,
       }));
   }

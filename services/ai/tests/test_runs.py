@@ -1,11 +1,13 @@
+import asyncio
 import json
 from uuid import UUID
 
 import pytest
 from starlette.testclient import TestClient
 
-from rag_ai.contracts.agent_events import RunRequest
+from rag_ai.contracts.agent_events import ChatRequest
 from rag_ai.main import app
+from rag_ai.routes import runs as runs_module
 from rag_ai.routes.runs import cancel_run
 from rag_ai.runtime.fake_agent import fake_agent_events
 from rag_ai.runtime.registry import run_registry
@@ -13,17 +15,47 @@ from rag_ai.runtime.registry import run_registry
 REQUEST_ID = "00000000-0000-4000-8000-000000000001"
 
 
-def test_run_streams_ordered_ndjson_events() -> None:
-    client = TestClient(app)
-    payload = {
+def _minimal_payload() -> dict:
+    return {
         "requestId": REQUEST_ID,
         "traceId": "trace-test",
         "actorId": "actor-test",
         "question": "请给我一个可取消流的例子",
         "selectedSpaceIds": [],
+        "aclSnapshot": {
+            "userId": "00000000-0000-4000-8000-000000000001",
+            "admin": False,
+            "groupIds": [],
+            "spaces": {},
+        },
+        "history": [],
     }
 
-    with client.stream("POST", "/v1/agent/runs", json=payload) as response:
+
+class FakeAgent:
+    async def run(self, **kwargs):  # noqa: ANN003,ARG002
+        request_id = UUID(REQUEST_ID)
+        cancelled = asyncio.Event()
+        async for event in fake_agent_events(
+            ChatRequest(
+                requestId=request_id,
+                traceId="trace-test",
+                actorId="actor-test",
+                question="fake",
+                selectedSpaceIds=[],
+                aclSnapshot={},
+                history=[],
+            ),
+            cancelled,
+        ):
+            yield event
+
+
+def test_run_streams_ordered_ndjson_events() -> None:
+    runs_module._agent = FakeAgent()
+    client = TestClient(app)
+
+    with client.stream("POST", "/v1/agent/runs", json=_minimal_payload()) as response:
         events = [json.loads(line) for line in response.iter_lines() if line]
 
     assert response.headers["content-type"].startswith("application/x-ndjson")
@@ -55,6 +87,13 @@ def test_duplicate_active_run_returns_conflict_before_streaming() -> None:
         "actorId": "actor-test",
         "question": "重复运行",
         "selectedSpaceIds": [],
+        "aclSnapshot": {
+            "userId": "00000000-0000-4000-8000-000000000001",
+            "admin": False,
+            "groupIds": [],
+            "spaces": {},
+        },
+        "history": [],
     }
 
     try:
@@ -69,12 +108,14 @@ def test_duplicate_active_run_returns_conflict_before_streaming() -> None:
 @pytest.mark.asyncio
 async def test_cancel_route_stops_an_active_generator() -> None:
     request_id = UUID("00000000-0000-4000-8000-000000000025")
-    request = RunRequest(
+    request = ChatRequest(
         requestId=request_id,
         traceId="trace-cancel",
         actorId="actor-test",
         question="验证取消传播",
         selectedSpaceIds=[],
+        aclSnapshot={},
+        history=[],
     )
     cancelled = run_registry.acquire(request_id)
     events = []

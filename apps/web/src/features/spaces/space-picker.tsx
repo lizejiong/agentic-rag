@@ -40,7 +40,9 @@ export function SpacePicker({
                 />
                 <span>
                   <strong>{space.name}</strong>
-                  <small>{space.effectivePermission}</small>
+                  <small>
+                    {space.documentCount} 文档 · {space.effectivePermission}
+                  </small>
                 </span>
               </label>
             );

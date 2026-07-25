@@ -18,7 +18,7 @@ def test_agent_event_fixture_matches_contract() -> None:
         for line in fixture_path.read_text(encoding="utf-8").splitlines()
     ]
 
-    assert [event.seq for event in events] == list(range(6))
+    assert [event.seq for event in events] == list(range(len(events)))
 
 
 def test_agent_event_rejects_unknown_fields() -> None:

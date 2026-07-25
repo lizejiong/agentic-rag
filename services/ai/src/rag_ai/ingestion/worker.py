@@ -29,12 +29,22 @@ class IngestionProcessor(Protocol):
     ) -> IngestionResult: ...
 
 
+class ChunkIndexer(Protocol):
+    async def index(
+        self,
+        *,
+        command: IngestionCommand,
+        result: IngestionResult,
+    ) -> None: ...
+
+
 class DurableIngestionWorker:
     def __init__(
         self,
         transport: RedisStreamTransport,
         repository: IngestionRepository,
         processor: IngestionProcessor,
+        indexer: ChunkIndexer | None = None,
         *,
         dead_letter_stream: str,
         batch_size: int,
@@ -43,6 +53,7 @@ class DurableIngestionWorker:
         self._transport = transport
         self._repository = repository
         self._processor = processor
+        self._indexer = indexer
         self._dead_letter_stream = dead_letter_stream
         self._batch_size = batch_size
         self._block_milliseconds = block_milliseconds
@@ -98,6 +109,18 @@ class DurableIngestionWorker:
                 ),
             )
             await self._repository.succeed(command, result)
+            if self._indexer is not None:
+                try:
+                    await self._indexer.index(command=command, result=result)
+                except Exception:
+                    logger.exception(
+                        "Chunk indexing failed after ingestion succeeded",
+                        extra={"event_id": str(envelope.event_id)},
+                    )
+                    # The ingestion run is already marked succeeded; the document
+                    # is searchable via lexical index on retry. We do not fail the
+                    # whole run here to avoid re-parsing. A reconciliation task
+                    # will retry missing embeddings/ES records.
         except IngestionFailure as ingestion_failure:
             await self._repository.fail(command, ingestion_failure, stage)
         except Exception:

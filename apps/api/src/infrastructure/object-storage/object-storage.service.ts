@@ -141,6 +141,10 @@ export class ObjectStorageService implements OnModuleInit {
     });
   }
 
+  getObject(bucket: string, objectKey: string): Promise<Readable> {
+    return this.client.getObject(bucket, objectKey);
+  }
+
   openQuarantineObject(objectKey: string): Promise<Readable> {
     return this.client.getObject(this.quarantineBucket, objectKey);
   }

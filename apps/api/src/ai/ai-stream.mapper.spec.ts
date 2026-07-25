@@ -30,6 +30,8 @@ describe('AiStreamMapper', () => {
         type: 'citation',
         seq: 4,
         citationId: '00000000-0000-4000-8000-000000000002',
+        chunkId: '00000000-0000-4000-8000-000000000003',
+        documentId: '00000000-0000-4000-8000-000000000004',
         title: '文档',
         snippet: '证据',
         location: { page: 1 },
@@ -47,6 +49,8 @@ describe('AiStreamMapper', () => {
       id: '00000000-0000-4000-8000-000000000002',
       data: {
         citationId: '00000000-0000-4000-8000-000000000002',
+        chunkId: '00000000-0000-4000-8000-000000000003',
+        documentId: '00000000-0000-4000-8000-000000000004',
         title: '文档',
         snippet: '证据',
         location: { page: 1 },

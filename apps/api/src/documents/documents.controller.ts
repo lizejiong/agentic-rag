@@ -1,4 +1,16 @@
-import { Controller, Get, Param, ParseUUIDPipe, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import type { Response } from 'express';
 
 import { AccessTokenGuard } from '../auth/access-token.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -15,8 +27,15 @@ export class DocumentsController {
   @Get('spaces/:spaceId/documents')
   @UseGuards(SpacePermissionGuard)
   @RequireSpacePermission('VIEW')
-  list(@Param('spaceId', ParseUUIDPipe) spaceId: string) {
-    return this.documents.list(spaceId);
+  list(
+    @Param('spaceId', ParseUUIDPipe) spaceId: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    const filters: { search?: string; status?: string } = {};
+    if (search) filters.search = search;
+    if (status) filters.status = status;
+    return this.documents.list(spaceId, filters);
   }
 
   @Get('documents/:documentId')
@@ -25,5 +44,48 @@ export class DocumentsController {
     @Param('documentId', ParseUUIDPipe) documentId: string,
   ) {
     return this.documents.get(user, documentId);
+  }
+
+  @Get('documents/:documentId/download')
+  async download(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Res() response: Response,
+  ) {
+    await this.documents.download(user, documentId, response);
+  }
+
+  @Get('documents/:documentId/content')
+  getContent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.documents.getContent(user, documentId);
+  }
+
+  @Get('documents/:documentId/chunks')
+  getChunks(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.documents.getChunks(user, documentId);
+  }
+
+  @Post('documents/:documentId/reindex')
+  @HttpCode(200)
+  reindex(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.documents.reindex(user, documentId);
+  }
+
+  @Delete('documents/:documentId')
+  @HttpCode(200)
+  async delete(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.documents.delete(user, documentId);
   }
 }

@@ -57,6 +57,8 @@ async def fake_agent_events(request: RunRequest, cancelled: asyncio.Event) -> As
         **event_fields(request, seq),
         type="citation",
         citationId=UUID("00000000-0000-4000-8000-000000000002"),
+        chunkId=UUID("00000000-0000-4000-8000-000000000002"),
+        documentId=UUID("00000000-0000-4000-8000-000000000003"),
         title="协议示例文档",
         snippet="仅用于验证流式引用。",
         location=CitationLocation(page=1),
