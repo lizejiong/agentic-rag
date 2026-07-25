@@ -175,6 +175,31 @@ export function getDocumentContent(
   });
 }
 
+const documentChunkSchema = z.object({
+  id: z.string().uuid(),
+  index: z.number().int().nonnegative(),
+  content: z.string(),
+  tokenCount: z.number().int().nonnegative(),
+  location: z.unknown(),
+});
+
+const documentChunkListSchema = z.array(documentChunkSchema);
+
+export type DocumentChunk = z.infer<typeof documentChunkSchema>;
+
+export function getDocumentChunks(
+  fetcher: Fetcher,
+  documentId: string,
+  signal?: AbortSignal,
+) {
+  return requestJson({
+    schema: documentChunkListSchema,
+    input: `/api/documents/${documentId}/chunks`,
+    init: signal ? { signal } : {},
+    fetcher,
+  });
+}
+
 export async function deleteDocument(fetcher: Fetcher, documentId: string): Promise<void> {
   const response = await fetcher(`/api/documents/${documentId}`, {
     method: 'DELETE',

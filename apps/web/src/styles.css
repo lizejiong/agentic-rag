@@ -1106,6 +1106,39 @@ h1 {
   font-size: 12px;
 }
 
+.chunk-load-btn {
+  margin-left: 12px;
+  padding: 4px 12px;
+  color: #8bddc8;
+  border: 1px solid rgba(139, 221, 200, 0.25);
+  border-radius: 7px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.chunk-loading {
+  margin-left: 12px;
+  color: #6f7b88;
+  font-size: 12px;
+  font-weight: 400;
+  vertical-align: middle;
+}
+
+.chunk-content-cell {
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chunk-location-cell {
+  color: #6f7b88;
+  font-size: 11px;
+}
+
 .document-content-view pre {
   margin: 0;
   color: #cdd6df;

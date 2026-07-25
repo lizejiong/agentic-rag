@@ -16,6 +16,14 @@ interface NormalizedElementRow {
   content: string;
 }
 
+interface ChunkRow {
+  id: string;
+  chunk_index: number;
+  content: string;
+  token_count: number;
+  location: unknown;
+}
+
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -287,5 +295,36 @@ export class DocumentsService {
     });
 
     return { documentId, status: 'SOFT_DELETED' };
+  }
+
+  async getChunks(user: AuthenticatedUser, documentId: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      select: { availability: true, spaceId: true, activeVersionId: true },
+    });
+    if (!document || document.availability === 'SOFT_DELETED') {
+      throw new NotFoundException('DOCUMENT_NOT_FOUND');
+    }
+    await this.spacePolicy.require(user, document.spaceId, 'VIEW');
+
+    const versionId = document.activeVersionId;
+    if (!versionId) {
+      throw new NotFoundException('DOCUMENT_NO_ACTIVE_VERSION');
+    }
+
+    const rows = await this.prisma.$queryRaw<ChunkRow[]>`
+      SELECT id, chunk_index, content, token_count, location
+      FROM rag.chunks
+      WHERE version_id = ${versionId}::uuid
+      ORDER BY chunk_index
+    `;
+
+    return rows.map((row) => ({
+      id: row.id,
+      index: row.chunk_index,
+      content: row.content,
+      tokenCount: row.token_count,
+      location: row.location,
+    }));
   }
 }

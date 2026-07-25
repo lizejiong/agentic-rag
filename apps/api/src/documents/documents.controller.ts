@@ -62,6 +62,14 @@ export class DocumentsController {
     return this.documents.getContent(user, documentId);
   }
 
+  @Get('documents/:documentId/chunks')
+  getChunks(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.documents.getChunks(user, documentId);
+  }
+
   @Delete('documents/:documentId')
   @HttpCode(200)
   async delete(

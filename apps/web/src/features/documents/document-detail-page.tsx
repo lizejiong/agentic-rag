@@ -5,7 +5,9 @@ import { useAuth } from '../auth/auth-provider';
 import {
   deleteDocument,
   downloadDocument,
+  getDocumentChunks,
   getDocumentContent,
+  type DocumentChunk,
   type DocumentContent,
 } from './documents-api';
 import { useDocumentQuery } from './use-document-query';
@@ -22,6 +24,16 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatLocation(location: unknown): string {
+  if (!location || typeof location !== 'object') return '-';
+  const loc = location as Record<string, unknown>;
+  const parts: string[] = [];
+  if (loc.page != null) parts.push(`p${loc.page}`);
+  if (loc.slide != null) parts.push(`slide ${loc.slide}`);
+  if (loc.sheet) parts.push(String(loc.sheet));
+  return parts.length > 0 ? parts.join(' ') : '-';
+}
+
 export function DocumentDetailPage() {
   const { documentId = '' } = useParams();
   const navigate = useNavigate();
@@ -32,6 +44,20 @@ export function DocumentDetailPage() {
   const [documentContent, setDocumentContent] = useState<DocumentContent | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [chunks, setChunks] = useState<DocumentChunk[] | null>(null);
+  const [chunksLoading, setChunksLoading] = useState(false);
+
+  const handleLoadChunks = async () => {
+    setChunksLoading(true);
+    try {
+      const data = await getDocumentChunks(auth.authorizedFetch, documentId);
+      setChunks(data);
+    } catch {
+      setContentError('CHUNK_LIST_LOAD_FAILED');
+    } finally {
+      setChunksLoading(false);
+    }
+  };
 
   const handleView = async () => {
     setContentView('loading');
@@ -204,6 +230,53 @@ export function DocumentDetailPage() {
               </p>
               <pre>{documentContent.fullText}</pre>
             </section>
+          ) : null}
+        </section>
+
+        <section className="document-detail-section">
+          <h2>
+            文本块（Chunks）
+            {!chunks && chunksLoading === false ? (
+              <button
+                type="button"
+                className="chunk-load-btn"
+                onClick={() => void handleLoadChunks()}
+              >
+                加载
+              </button>
+            ) : null}
+            {chunksLoading ? <span className="chunk-loading">加载中…</span> : null}
+          </h2>
+          {chunks && chunks.length === 0 ? (
+            <p className="document-empty">暂无文本块。</p>
+          ) : chunks ? (
+            <div className="document-table-wrap">
+              <table className="document-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>内容</th>
+                    <th>Token</th>
+                    <th>位置</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {chunks.map((chunk) => (
+                    <tr key={chunk.id}>
+                      <td>{chunk.index}</td>
+                      <td className="chunk-content-cell">
+                        {chunk.content.slice(0, 200)}
+                        {chunk.content.length > 200 ? '…' : ''}
+                      </td>
+                      <td>{chunk.tokenCount}</td>
+                      <td className="chunk-location-cell">
+                        {formatLocation(chunk.location)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : null}
         </section>
 
