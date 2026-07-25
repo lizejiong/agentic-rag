@@ -2,7 +2,9 @@ import type { Server } from 'node:http';
 
 import { ForbiddenException, type ExecutionContext, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import type { AgentEvent, RunRequest } from '@rag/contracts';
+import type { AgentEvent } from '@rag/contracts';
+
+import type { RunRequestInput } from '../ai/ai-event-source';
 import request from 'supertest';
 
 import { AI_EVENT_SOURCE, type AiEventSource } from '../ai/ai-event-source';
@@ -26,11 +28,11 @@ const testAuthGuard = {
 };
 
 class FakeAiEventSource implements AiEventSource {
-  lastRequest: RunRequest | undefined;
+  lastRequest: RunRequestInput | undefined;
   lastSignal: AbortSignal | undefined;
   cancelledRequestId: string | undefined;
 
-  async *run(runRequest: RunRequest, signal: AbortSignal): AsyncIterable<AgentEvent> {
+  async *run(runRequest: RunRequestInput, signal: AbortSignal): AsyncIterable<AgentEvent> {
     await Promise.resolve();
     this.lastRequest = runRequest;
     this.lastSignal = signal;
@@ -47,6 +49,8 @@ class FakeAiEventSource implements AiEventSource {
       seq: 2,
       type: 'citation',
       citationId: '00000000-0000-4000-8000-000000000011',
+      chunkId: '00000000-0000-4000-8000-000000000012',
+      documentId: '00000000-0000-4000-8000-000000000013',
       title: '文档',
       snippet: '证据',
       location: { page: 1 },
@@ -76,7 +80,15 @@ describe('ChatController', () => {
         { provide: AI_EVENT_SOURCE, useValue: fake },
         {
           provide: AuthorizationService,
-          useValue: { requireSpace },
+          useValue: {
+            requireSpace,
+            snapshot: jest.fn().mockResolvedValue({
+              userId: '00000000-0000-4000-8000-000000000001',
+              admin: false,
+              groupIds: [],
+              spaces: {},
+            }),
+          },
         },
       ],
     })

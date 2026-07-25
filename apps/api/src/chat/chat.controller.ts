@@ -19,6 +19,7 @@ import { AiStreamMapper } from '../ai/ai-stream.mapper';
 import { AccessTokenGuard } from '../auth/access-token.guard';
 import type { AuthenticatedRequest } from '../auth/current-user.decorator';
 import { AuthorizationService } from '../authorization/authorization.service';
+import type { AuthorizationSnapshot } from '../authorization/authorization.types';
 import { ActiveRunRegistry } from './active-run.registry';
 import { ChatProtocolGuard } from './chat-protocol.guard';
 import { chatRequestSchema, type ChatRequest } from './chat.request';
@@ -42,6 +43,52 @@ function extractQuestion(messages: ChatRequest['messages']): string {
     .map((part) => part.text)
     .join('')
     .trim();
+}
+
+function extractHistory(
+  messages: ChatRequest['messages'],
+  snapshot: AuthorizationSnapshot,
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  const history: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  for (const message of messages) {
+    if (message.role !== 'user' && message.role !== 'assistant') {
+      continue;
+    }
+    const text = message.parts
+      .filter(
+        (part): part is { type: 'text'; text: string } =>
+          typeof part === 'object' &&
+          part !== null &&
+          'type' in part &&
+          part.type === 'text' &&
+          'text' in part &&
+          typeof part.text === 'string',
+      )
+      .map((part) => part.text)
+      .join('')
+      .trim();
+    if (!text) {
+      continue;
+    }
+    history.push({ role: message.role, content: text });
+  }
+  // Exclude the last user message that is the current question.
+  const last = history.at(-1);
+  if (last?.role === 'user') {
+    history.pop();
+  }
+  // Truncate to the most recent turns to stay within context budgets.
+  return history.slice(-(snapshot.spaces ? 10 : 6));
+}
+
+function buildAclSnapshot(snapshot: AuthorizationSnapshot): Record<string, unknown> {
+  return {
+    userId: snapshot.userId,
+    admin: snapshot.admin,
+    departmentId: snapshot.departmentId,
+    groupIds: snapshot.groupIds,
+    spaces: snapshot.spaces,
+  };
 }
 
 @Controller('chat')
@@ -71,6 +118,17 @@ export class ChatController {
         this.authorization.requireSpace(req.user, spaceId, 'VIEW'),
       ),
     );
+    const snapshot =
+      parsed.data.selectedSpaceIds.length > 0
+        ? await this.authorization.snapshot(req.user)
+        : ({
+            userId: req.user.id,
+            admin: req.user.role === 'ADMIN',
+            groupIds: [],
+            revision: 0n,
+            spaces: {},
+          } as AuthorizationSnapshot);
+    const history = extractHistory(parsed.data.messages, snapshot);
     const abort = this.activeRuns.start(requestId, req.user.id);
     req.once('aborted', () => abort.abort());
     res.once('close', () => {
@@ -92,6 +150,9 @@ export class ChatController {
                 actorId: req.user.id,
                 question,
                 selectedSpaceIds: parsed.data.selectedSpaceIds,
+                aclSnapshot: buildAclSnapshot(snapshot),
+                sessionId: parsed.data.id,
+                history,
               },
               abort.signal,
             )) {

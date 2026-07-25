@@ -1,13 +1,17 @@
-import type { AgentEvent, RunRequest } from '@rag/contracts';
+import type { AgentEvent } from '@rag/contracts';
 
+import type { RunRequestInput } from './ai-event-source';
 import { PythonAiClient } from './python-ai.client';
 
-const REQUEST: RunRequest = {
+const REQUEST: RunRequestInput = {
   requestId: '00000000-0000-4000-8000-000000000001',
   traceId: 'trace-test',
   actorId: 'actor-test',
   question: '测试问题',
   selectedSpaceIds: [],
+  aclSnapshot: {},
+  sessionId: undefined,
+  history: [],
 };
 
 function event(seq: number): AgentEvent {

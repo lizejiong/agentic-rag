@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { ChatModule } from './chat/chat.module';
+import { CitationsModule } from './citations/citations.module';
 import { DocumentsModule } from './documents/documents.module';
 import { HealthController } from './health/health.controller';
 import { ConfigurationModule } from './infrastructure/config/configuration.module';
@@ -12,6 +13,7 @@ import { DatabaseModule } from './infrastructure/database/database.module';
 import { ObjectStorageModule } from './infrastructure/object-storage/object-storage.module';
 import { OrganizationModule } from './organization/organization.module';
 import { OutboxModule } from './outbox/outbox.module';
+import { SearchModule } from './search/search.module';
 import { SpacesModule } from './spaces/spaces.module';
 import { UsersModule } from './users/users.module';
 
@@ -28,6 +30,8 @@ import { UsersModule } from './users/users.module';
     OrganizationModule,
     SpacesModule,
     DocumentsModule,
+    SearchModule,
+    CitationsModule,
     ChatModule,
   ],
   controllers: [HealthController],

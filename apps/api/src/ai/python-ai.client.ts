@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { agentEventSchema, type AgentEvent, type RunRequest } from '@rag/contracts';
+import { agentEventSchema, type AgentEvent } from '@rag/contracts';
 
-import type { AiEventSource } from './ai-event-source';
+import type { AiEventSource, RunRequestInput } from './ai-event-source';
 import { parseNdjson } from './ndjson';
 
 @Injectable()
 export class PythonAiClient implements AiEventSource {
   private readonly baseUrl = process.env.AI_SERVICE_URL ?? 'http://127.0.0.1:8001';
 
-  async *run(request: RunRequest, signal: AbortSignal): AsyncIterable<AgentEvent> {
+  async *run(request: RunRequestInput, signal: AbortSignal): AsyncIterable<AgentEvent> {
     try {
       const response = await fetch(`${this.baseUrl}/v1/agent/runs`, {
         method: 'POST',
