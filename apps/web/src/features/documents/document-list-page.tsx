@@ -8,12 +8,21 @@ import { DocumentUrlImportPanel } from './document-url-import-panel';
 import { refreshUrlImport, waitForImport } from './documents-api';
 import { useDocumentsQuery } from './use-documents-query';
 
+const STATUS_OPTIONS = [
+  { value: '', label: '全部状态' },
+  { value: 'READY', label: '就绪' },
+  { value: 'FAILED', label: '失败' },
+  { value: 'QUEUED', label: '处理中' },
+];
+
 export function DocumentListPage() {
   const { spaceId = '' } = useParams();
   const auth = useAuth();
   const spaces = useSpacesQuery(auth.authorizedFetch);
   const selectedSpace = spaces.data?.find((space) => space.id === spaceId);
-  const documents = useDocumentsQuery(auth.authorizedFetch, spaceId);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const documents = useDocumentsQuery(auth.authorizedFetch, spaceId, { search, status: statusFilter });
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
 
@@ -65,6 +74,26 @@ export function DocumentListPage() {
           fetcher={auth.authorizedFetch}
           onQueued={() => documents.refetch()}
         />
+        <div className="document-filters">
+          <input
+            className="document-search"
+            type="search"
+            placeholder="搜索文档名称…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select
+            className="document-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <section className="document-list" aria-label="文档列表">
           {documents.isPending ? <p>正在加载文档…</p> : null}
           {documents.isError ? <p role="alert">文档列表加载失败。</p> : null}
@@ -73,17 +102,19 @@ export function DocumentListPage() {
           ) : null}
           {documents.data?.map((document) => (
             <article className="document-card" key={document.id}>
-              <div>
-                <h2>{document.title}</h2>
-                <p>
-                  v{document.latestVersion?.versionNumber ?? 1} ·{' '}
-                  {document.latestVersion?.processingStatus ?? 'PENDING_UPLOAD'}
-                </p>
-              </div>
-              <div className="document-status">
-                <strong>{document.latestImport?.progress ?? 0}%</strong>
-                <span>{document.availability}</span>
-              </div>
+              <Link className="document-card-link" to={`/documents/${document.id}`}>
+                <div>
+                  <h2>{document.title}</h2>
+                  <p>
+                    v{document.latestVersion?.versionNumber ?? 1} ·{' '}
+                    {document.latestVersion?.processingStatus ?? 'PENDING_UPLOAD'}
+                  </p>
+                </div>
+                <div className="document-status">
+                  <strong>{document.latestImport?.progress ?? 0}%</strong>
+                  <span>{document.availability}</span>
+                </div>
+              </Link>
               {document.sourceType === 'URL' ? (
                 <div className="document-source-actions">
                   <span>

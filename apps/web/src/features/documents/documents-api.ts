@@ -25,10 +25,19 @@ export const allowedExtensions = new Set([
   'json',
 ]);
 
-export function listDocuments(fetcher: Fetcher, spaceId: string, signal?: AbortSignal) {
+export function listDocuments(
+  fetcher: Fetcher,
+  spaceId: string,
+  filters?: { search?: string; status?: string },
+  signal?: AbortSignal,
+) {
+  const params = new URLSearchParams();
+  if (filters?.search) params.set('search', filters.search);
+  if (filters?.status) params.set('status', filters.status);
+  const query = params.toString();
   return requestJson({
     schema: documentListSchema,
-    input: `/api/spaces/${spaceId}/documents`,
+    input: `/api/spaces/${spaceId}/documents${query ? `?${query}` : ''}`,
     init: signal ? { signal } : {},
     fetcher,
   });

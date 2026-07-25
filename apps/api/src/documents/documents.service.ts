@@ -24,9 +24,21 @@ export class DocumentsService {
     private readonly storage: ObjectStorageService,
   ) {}
 
-  async list(spaceId: string) {
+  async list(spaceId: string, filters?: { search?: string; status?: string }) {
+    const where: Record<string, unknown> = {
+      spaceId,
+      availability: { not: 'SOFT_DELETED' },
+    };
+    if (filters?.search) {
+      where.title = { contains: filters.search, mode: 'insensitive' };
+    }
+    if (filters?.status) {
+      where.versions = {
+        some: { processingStatus: filters.status },
+      };
+    }
     const documents = await this.prisma.document.findMany({
-      where: { spaceId, availability: { not: 'SOFT_DELETED' } },
+      where,
       select: {
         id: true,
         spaceId: true,

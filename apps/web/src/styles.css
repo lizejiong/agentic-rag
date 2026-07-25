@@ -213,6 +213,37 @@ a {
   background: #0c1117;
 }
 
+.document-filters {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.document-search {
+  flex: 1;
+  padding: 10px 14px;
+  color: #edf3f7;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  outline: 0;
+  background: #0c1117;
+  font-size: 13px;
+}
+
+.document-search::placeholder {
+  color: #5f6a76;
+}
+
+.document-status-filter {
+  min-width: 130px;
+  padding: 10px 12px;
+  color: #dbe6e3;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: #11161d;
+  font-size: 13px;
+}
+
 .document-source-actions {
   display: grid;
   justify-items: end;

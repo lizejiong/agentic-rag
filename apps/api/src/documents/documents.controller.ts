@@ -5,6 +5,7 @@ import {
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -25,8 +26,15 @@ export class DocumentsController {
   @Get('spaces/:spaceId/documents')
   @UseGuards(SpacePermissionGuard)
   @RequireSpacePermission('VIEW')
-  list(@Param('spaceId', ParseUUIDPipe) spaceId: string) {
-    return this.documents.list(spaceId);
+  list(
+    @Param('spaceId', ParseUUIDPipe) spaceId: string,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    const filters: { search?: string; status?: string } = {};
+    if (search) filters.search = search;
+    if (status) filters.status = status;
+    return this.documents.list(spaceId, filters);
   }
 
   @Get('documents/:documentId')
