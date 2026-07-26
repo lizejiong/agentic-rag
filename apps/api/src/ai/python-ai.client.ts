@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { agentEventSchema, type AgentEvent } from '@rag/contracts';
 
 import type { AiEventSource, RunRequestInput } from './ai-event-source';
@@ -6,6 +6,7 @@ import { parseNdjson } from './ndjson';
 
 @Injectable()
 export class PythonAiClient implements AiEventSource {
+  private readonly logger = new Logger(PythonAiClient.name);
   private readonly baseUrl = process.env.AI_SERVICE_URL ?? 'http://127.0.0.1:8001';
 
   async *run(request: RunRequestInput, signal: AbortSignal): AsyncIterable<AgentEvent> {
@@ -22,7 +23,12 @@ export class PythonAiClient implements AiEventSource {
 
       let expectedSeq = 0;
       for await (const value of parseNdjson(response.body)) {
-        const event = agentEventSchema.parse(value);
+        const parsed = agentEventSchema.safeParse(value);
+        if (!parsed.success) {
+          this.logger.error(`Invalid AI event: ${parsed.error.message}`);
+          throw new Error('Invalid AI event');
+        }
+        const event = parsed.data;
         if (event.seq !== expectedSeq) {
           throw new Error('Non-monotonic AI event sequence');
         }

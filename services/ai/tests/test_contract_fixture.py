@@ -18,6 +18,7 @@ def test_agent_event_fixture_matches_contract() -> None:
         for line in fixture_path.read_text(encoding="utf-8").splitlines()
     ]
 
+    assert len(events) == 10, f"Expected 10 events, got {len(events)}"
     assert [event.seq for event in events] == list(range(len(events)))
 
 

@@ -115,7 +115,10 @@ class ChunkIndexer:
                             gen_random_uuid(), :chunk_id, :embedding_model,
                             :embedding_version, :dimensions, :embedding
                         )
-                        ON CONFLICT (chunk_id, embedding_model, embedding_version) DO NOTHING
+                        ON CONFLICT (chunk_id, embedding_model, embedding_version) DO UPDATE
+                        SET dimensions = EXCLUDED.dimensions,
+                            embedding = EXCLUDED.embedding,
+                            created_at = NOW()
                         """
                     ),
                     [
