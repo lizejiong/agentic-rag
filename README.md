@@ -2,7 +2,7 @@
 
 Atlas RAG 是一个面向企业知识场景的 Agentic RAG 项目。目标能力包括文档管理、混合检索、可追溯 AI 问答、知识图谱、分层记忆、语音交互与可观测性。
 
-当前仓库已完成 **Phase 0 工程基础** 和 **Phase 1 本地数据、认证与授权基础**：
+当前仓库已完成 **Phase 0 工程基础**、**Phase 1 本地数据、认证与授权基础** 和 **Phase 2 文档导入与生命周期**；**Phase 3 混合检索与可验证问答** 已完成核心管线并通过真实模型端到端冒烟。
 
 - React + Vercel AI SDK 聊天界面
 - NestJS 外部 API 与 AI SDK UI Message Stream
@@ -17,9 +17,11 @@ Atlas RAG 是一个面向企业知识场景的 Agentic RAG 项目。目标能力
 - 文档 ACL 收紧、统一授权快照、revision 缓存失效与聊天入口强制鉴权
 - 不可变审计、事务 PostgreSQL Outbox、Redis Streams 幂等消费、退避与死信
 - React 内存 access token、HttpOnly cookie 会话恢复和知识空间选择
+- 多格式文件与 URL 导入、ClamAV 扫描、Docling 解析、版本管理、删除/重试/替换和文档管理界面
+- pgvector + Elasticsearch 混合检索、RRF、Reranker、引用、检索摘要和 Redis 会话记忆
+- OpenAI 兼容的 Embedding/Chat 模型适配与真实模型连接检查
 
-文档上传与解析、PGVector + Elasticsearch 混合检索、RRF、Reranker、Neo4j 图谱、
-Redis/mem0 记忆、LangGraph Agent、语音和可观测性将在后续阶段逐步实现，详见
+Neo4j 图谱治理、长期记忆、LangGraph 扩展路由、评测中心、语音和可观测性仍在后续阶段，详见
 [总路线图](docs/superpowers/plans/2026-07-18-enterprise-rag-master-roadmap.md)。
 
 ## 工作区

@@ -117,11 +117,11 @@ start -> load_memory -> understand_query -> decide_route -> retrieve -> merge_ev
 
 - [ ] Recall@10 ≥ 0.85、nDCG@10 ≥ 0.75 在 fixture 评测集上成立（使用确定性 embedding 的语义测试集）。
 - [ ] 引用准确率 ≥ 0.95（每个 citation 指向真实存在的块）。
-- [ ] 无 ACL 越权：禁用/撤权文档不可召回，引用解析返回无权访问。
-- [ ] 证据不足案例返回 `INSUFFICIENT_EVIDENCE` 状态，不编造答案。
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` 全部通过。
-- [ ] Python `ruff check`, `mypy`, `pytest` 全部通过。
-- [ ] 三进程 smoke（web/api/ai）问答链路可运行并返回真实检索结果。
+- [x] 无 ACL 越权：禁用/撤权文档不可召回，引用解析返回无权访问。
+- [x] 证据不足案例返回 `INSUFFICIENT_EVIDENCE` 状态，不编造答案。
+- [x] `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` 全部通过。
+- [x] Python `ruff check`, `mypy`, `pytest` 全部通过（2026-07-26）。
+- [x] 三进程 smoke（web/api/ai）问答链路可运行并返回真实检索结果（2026-07-26 真实模型 E2E）。
 
 ---
 
