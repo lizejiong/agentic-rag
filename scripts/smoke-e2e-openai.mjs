@@ -173,10 +173,14 @@ console.log('8. Chat (real models)...');
   const citations = events.filter(e => e.type === 'data-citation');
   const textParts = events.filter(e => e.type === 'text-delta' || e.type === 'text');
   const summaries = events.filter(e => e.type === 'data-retrieval-summary');
+  const errors = events.filter(e => e.type === 'error');
 
   console.log(`   citations: ${citations.length}`);
   console.log(`   retrieval summaries: ${summaries.length}`);
   console.log(`   text parts: ${textParts.length}`);
+  for (const event of errors) {
+    console.log(`   error: ${event.errorText ?? JSON.stringify(event)}`);
+  }
 
   if (citations.length > 0) {
     console.log(`   first citation: "${citations[0]?.data?.title}"`);

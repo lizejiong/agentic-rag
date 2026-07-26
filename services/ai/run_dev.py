@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 
 if sys.platform == "win32":
@@ -10,4 +11,10 @@ if sys.platform == "win32":
 import uvicorn
 
 if __name__ == "__main__":
-    uvicorn.run("rag_ai.main:app", host="127.0.0.1", port=8001, reload=True)
+    uvicorn.run(
+        "rag_ai.main:app",
+        host="127.0.0.1",
+        port=int(os.environ.get("AI_PORT", "8001")),
+        loop="asyncio",
+        reload=sys.platform != "win32",
+    )

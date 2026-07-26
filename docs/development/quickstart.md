@@ -69,7 +69,7 @@ pnpm db:seed
 - Alembic 只管理 PostgreSQL `rag` schema。
 - 不要用任一工具修改对方的 migration history。
 
-## 5. 启动三个开发进程
+## 5. 启动四个开发进程
 
 终端 A：
 
@@ -80,10 +80,16 @@ pnpm dev:ai
 终端 B：
 
 ```bash
-pnpm dev:api
+pnpm dev:worker
 ```
 
 终端 C：
+
+```bash
+pnpm dev:api
+```
+
+终端 D：
 
 ```bash
 pnpm dev:web

@@ -55,6 +55,7 @@ pnpm db:seed
 
 ```bash
 pnpm dev:ai
+pnpm dev:worker
 pnpm dev:api
 pnpm dev:web
 ```

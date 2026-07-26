@@ -10,6 +10,7 @@
     "dev:web": "pnpm --filter @rag/web dev",
     "dev:api": "pnpm prepare:generated && pnpm --filter @rag/api start:dev",
     "dev:ai": "uv run --project services/ai python services/ai/run_dev.py",
+    "dev:worker": "uv run --project services/ai python -m rag_ai.worker_main",
     "infra:up": "docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml up -d",
     "infra:down": "docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml down",
     "infra:ps": "docker compose --env-file infra/compose/.env -f infra/compose/compose.yaml ps",
