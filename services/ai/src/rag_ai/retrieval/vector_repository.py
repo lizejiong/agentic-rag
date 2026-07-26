@@ -61,6 +61,7 @@ class VectorRepository:
                       AND c.is_searchable = true
                       AND e.embedding_model = :embedding_model
                       AND e.embedding_version = :embedding_version
+                      AND e.dimensions = :dimensions
                     ORDER BY e.embedding <=> :embedding
                     LIMIT :top_k * 4
                     """
@@ -70,6 +71,7 @@ class VectorRepository:
                     "space_ids": [str(space_id) for space_id in allowed_space_ids],
                     "embedding_model": self._embedding_model,
                     "embedding_version": self._embedding_version,
+                    "dimensions": len(query_embedding),
                     "top_k": top_k,
                 },
         )
