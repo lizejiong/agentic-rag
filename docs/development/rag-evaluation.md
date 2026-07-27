@@ -55,6 +55,8 @@ uv run --project services/ai python services/ai/scripts/evaluate_retrieval.py --
 3. 运行评测脚本，保存 JSON 报告和输入数据版本。
 4. 三项指标均达到门槛后，记录在路线图的出口检查中；否则按失败样本优化召回、重排或引用生成。
 
+SciFact 可用于“引用是否指向相关论文”的自动基础检查；HotpotQA 可进一步验证引用是否指向 supporting facts 所在文章。逐句引用是否被证据支持，仍需要句子级映射或人工标注样本。
+
 ## 运行记录
 
 - 2026-07-26：已用隔离的 `SciFact Evaluation` 空间完成 1 个真实问题、10 篇论文的端到端检索冒烟测试。

@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from rag_ai.evaluation.metrics import citation_precision, ndcg_at_k, recall_at_k
+from rag_ai.evaluation.citations import citation_document_ids
 
 
 def load_report_builder():
@@ -26,6 +27,17 @@ def test_retrieval_metrics_reward_relevant_ranked_results() -> None:
 
 def test_citation_precision_rejects_unsupported_citations() -> None:
     assert citation_precision(["chunk-a", "unknown"], {"chunk-a"}) == 0.5
+
+
+def test_citation_document_ids_preserves_first_occurrence() -> None:
+    assert citation_document_ids(
+        [
+            {"type": "citation", "documentId": "document-a"},
+            {"type": "text.delta", "text": "answer"},
+            {"type": "citation", "documentId": "document-a"},
+            {"type": "citation", "documentId": "document-b"},
+        ]
+    ) == ["document-a", "document-b"]
 
 
 def test_document_level_retrieval_can_skip_citation_gate_for_scifact() -> None:
