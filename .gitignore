@@ -22,4 +22,6 @@ __pycache__/
 .smoke-logs/
 .pytest-phase2/
 .playwright-cli/
+services/ai/evals/data/
+services/ai/evals/cases/
 output/playwright/

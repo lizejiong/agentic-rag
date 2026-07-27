@@ -1,0 +1,2 @@
+{"id":"retrieval-001","retrievedChunkIds":["chunk-a","chunk-b","chunk-c"],"relevantChunkIds":["chunk-a","chunk-b"],"citationIds":["chunk-a","chunk-b"],"supportedCitationIds":["chunk-a","chunk-b"]}
+{"id":"retrieval-002","retrievedChunkIds":["chunk-d","chunk-e"],"relevantChunkIds":["chunk-d"],"citationIds":["chunk-d"],"supportedCitationIds":["chunk-d"]}

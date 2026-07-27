@@ -138,5 +138,7 @@ start -> load_memory -> understand_query -> decide_route -> retrieve -> merge_ev
 - [x] 9. API 层：`/search`、`/citations/:id/resolve`、聊天上下文传递。
 - [x] 10. 前端层：检索摘要和引用 UI。
 - [x] 11. 测试：单元、集成、契约、端到端和 smoke。
-- [ ] 12. 出口检查：运行完整验收命令并记录结果。
+- [x] 12. 评测基础设施：实现 Recall@10、nDCG@10、引用准确率计算及 JSONL 阈值报告运行器。
+- [x] 13. 社区基线：接入 BEIR SciFact，生成可复用的检索问题与 qrels 标注集。
+- [ ] 14. 出口检查：将基线语料导入候选环境，运行完整验收命令并记录结果。
 
