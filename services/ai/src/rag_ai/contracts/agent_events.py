@@ -99,7 +99,7 @@ class RunRequest(StrictModel):
     traceId: str = Field(min_length=1)
     actorId: str = Field(min_length=1)
     question: str = Field(min_length=1, max_length=8000)
-    selectedSpaceIds: list[UUID] = Field(max_length=20)
+    selectedSpaceIds: list[UUID] = Field(max_length=100)
     aclSnapshot: dict[str, Any] = Field(default_factory=dict)
     sessionId: str | None = Field(default=None, max_length=120)
 

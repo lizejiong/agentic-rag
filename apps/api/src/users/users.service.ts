@@ -14,6 +14,13 @@ export class UsersService {
     private readonly revision: AuthorizationRevisionService,
   ) {}
 
+  list() {
+    return this.prisma.user.findMany({
+      orderBy: { username: 'asc' },
+      select: { id: true, username: true, displayName: true, role: true, status: true },
+    });
+  }
+
   async create(input: {
     username: string;
     displayName: string;

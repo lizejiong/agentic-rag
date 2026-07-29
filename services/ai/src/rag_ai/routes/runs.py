@@ -77,7 +77,7 @@ async def _load_space_policies(space_ids: list[UUID], acl: AclSnapshot) -> list[
                         WHERE id = ANY(:space_ids)
                         """
                     ),
-                    {"space_ids": [str(sid) for sid in allowed_space_ids]},
+                    {"space_ids": allowed_space_ids},
                 )
                 return result.mappings().all()
         finally:

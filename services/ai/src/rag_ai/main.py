@@ -11,7 +11,9 @@ from rag_ai.routes.runs import router as runs_router
 from rag_ai.routes.search_test import router as search_test_router
 
 if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    selector_policy = getattr(asyncio, "WindowsSelectorEventLoopPolicy", None)
+    if selector_policy is not None:
+        asyncio.set_event_loop_policy(selector_policy())
 
 logging.basicConfig(level=logging.INFO)
 

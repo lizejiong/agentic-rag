@@ -1,17 +1,15 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
-
 from pydantic import Field, RedisDsn
 from pydantic_settings import SettingsConfigDict
 
-from rag_ai.infrastructure.database.settings import DatabaseSettings, PROJECT_ROOT
+from rag_ai.infrastructure.database.settings import DatabaseSettings, workspace_env_file
 
 
 class WorkerSettings(DatabaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(Path.cwd() / ".env", PROJECT_ROOT / ".env"),
+        env_file=workspace_env_file(),
         env_file_encoding="utf-8",
         extra="ignore",
     )

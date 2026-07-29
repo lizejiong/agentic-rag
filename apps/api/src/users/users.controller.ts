@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -36,6 +37,11 @@ function parseInput<T>(schema: z.ZodType<T>, input: unknown, code: string): T {
 @UseGuards(AccessTokenGuard, AdminGuard)
 export class UsersController {
   constructor(private readonly users: UsersService) {}
+
+  @Get()
+  list() {
+    return this.users.list();
+  }
 
   @Post()
   create(@Body() input: unknown) {

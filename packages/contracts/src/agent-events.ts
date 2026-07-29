@@ -87,7 +87,7 @@ export const runRequestSchema = z.object({
   traceId: z.string().min(1),
   actorId: z.string().min(1),
   question: z.string().trim().min(1).max(8000),
-  selectedSpaceIds: z.array(z.string().uuid()).max(20),
+  selectedSpaceIds: z.array(z.string().uuid()).max(100),
   aclSnapshot: z.record(z.string(), z.unknown()).default({}),
   sessionId: z.string().max(120).optional(),
   history: z.array(chatHistoryMessageSchema).default([]),
