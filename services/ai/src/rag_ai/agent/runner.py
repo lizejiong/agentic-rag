@@ -350,7 +350,7 @@ def _summary_to_event(summary: RetrievalSummary) -> dict[str, Any]:
                 "spaceId": str(path.space_id),
                 "candidatesReturned": path.candidates_returned,
                 "candidatesAfterAcl": path.candidates_after_acl,
-                "error": path.error,
+                **({"error": path.error} if path.error else {}),
             }
             for path in summary.paths
         ],

@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react';
 
+import { AlertCircle, FileUp, Upload } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+
 import type { Fetcher } from '../../shared/api/request-json';
 import { cancelImport, createFileImports, uploadFile } from './documents-api';
-import {
-  runWithConcurrency,
-  validateSelectedFiles,
-  type UploadRow,
-} from './document-upload-store';
+import { runWithConcurrency, validateSelectedFiles, type UploadRow } from './document-upload-store';
 
 export function DocumentUploadPanel({
   spaceId,
@@ -84,12 +85,10 @@ export function DocumentUploadPanel({
         return { ...row, ticket };
       });
       setRows(ticketedRows);
-      await runWithConcurrency(ticketedRows, 3, async (row) => {
-        await performUpload(row, token);
-      });
+      await runWithConcurrency(ticketedRows, 3, async (row) => performUpload(row, token));
       await onQueued();
     } catch (startError) {
-      setError(startError instanceof Error ? startError.message : '导入任务创建失败。');
+      setError(startError instanceof Error ? startError.message : 'IMPORT_CREATE_FAILED');
       setRows((current) =>
         current.map((row) =>
           row.status === 'waiting' ? { ...row, status: 'failed', error: 'IMPORT_CREATE_FAILED' } : row,
@@ -101,7 +100,7 @@ export function DocumentUploadPanel({
   const retry = async (row: UploadRow) => {
     const token = getAccessToken() ?? (await refreshAccessToken());
     if (!token) {
-      setError('登录会话已过期。');
+      setError('AUTH_SESSION_EXPIRED');
       return;
     }
     await performUpload(row, token);
@@ -120,41 +119,51 @@ export function DocumentUploadPanel({
   };
 
   return (
-    <section className="upload-panel" aria-labelledby="upload-title">
-      <div>
-        <p className="eyebrow">DOCUMENT INGESTION</p>
-        <h2 id="upload-title">导入文档</h2>
-        <p>支持 PDF、Office、TXT、Markdown、CSV 和 JSON，最多同时上传 3 个。</p>
+    <Card className="p-5" aria-labelledby="upload-title">
+      <div className="flex items-start justify-between gap-6">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
+            <FileUp size={17} aria-hidden="true" /> 上传文档
+          </div>
+          <h2 className="mt-3 text-base font-semibold" id="upload-title">选择要导入的文件</h2>
+          <p className="mt-2 text-sm text-slate-500">
+            支持 PDF、Office、TXT、Markdown、CSV 和 JSON，单次最多 100 个文件。
+          </p>
+        </div>
+        <Button disabled={busy} onClick={() => input.current?.click()} type="button">
+          <Upload size={16} aria-hidden="true" /> {busy ? '正在上传…' : '选择文件'}
+        </Button>
       </div>
       <input
         ref={input}
-        className="visually-hidden"
+        className="sr-only"
         type="file"
         multiple
         accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.csv,.json"
         onChange={(event) => void start(Array.from(event.target.files ?? []))}
       />
-      <button type="button" className="upload-button" disabled={busy} onClick={() => input.current?.click()}>
-        {busy ? '正在上传…' : '选择文件'}
-      </button>
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? (
+        <p className="mt-4 flex items-center gap-2 text-sm text-red-600" role="alert">
+          <AlertCircle size={16} aria-hidden="true" /> {error}
+        </p>
+      ) : null}
       {rows.length > 0 ? (
-        <ul className="upload-rows">
+        <ul className="mt-5 divide-y divide-slate-100 border-t border-slate-100">
           {rows.map((row) => (
-            <li key={row.id}>
-              <span>{row.file.name}</span>
-              <progress max="100" value={row.progress} />
-              <small>
+            <li className="grid grid-cols-[minmax(0,1fr)_160px_110px] items-center gap-4 py-3" key={row.id}>
+              <span className="truncate text-sm text-slate-700">{row.file.name}</span>
+              <progress className="h-2 w-full accent-blue-700" max="100" value={row.progress} />
+              <span className="text-right text-sm text-slate-500">
                 {row.status === 'failed' ? (
-                  <button type="button" onClick={() => void retry(row)}>重试</button>
+                  <button className="text-blue-700 hover:underline" type="button" onClick={() => void retry(row)}>重试</button>
                 ) : row.status === 'queued' ? (
-                  <button type="button" onClick={() => void cancel(row)}>取消处理</button>
+                  <button className="text-blue-700 hover:underline" type="button" onClick={() => void cancel(row)}>取消处理</button>
                 ) : row.status === 'cancelled' ? '已取消' : row.error ?? `${row.progress}%`}
-              </small>
+              </span>
             </li>
           ))}
         </ul>
       ) : null}
-    </section>
+    </Card>
   );
 }

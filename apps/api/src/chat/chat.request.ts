@@ -12,7 +12,7 @@ export const chatRequestSchema = z
   .object({
     id: z.string().min(1),
     requestId: z.string().uuid(),
-    selectedSpaceIds: z.array(z.string().uuid()).max(20).default([]),
+    selectedSpaceIds: z.array(z.string().uuid()).max(100).default([]),
     messages: z.array(messageSchema).min(1),
   })
   .strict();

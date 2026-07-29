@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { parseEnv } from 'node:util';
 
 import { z } from 'zod';
@@ -85,15 +85,21 @@ export type Environment = z.infer<typeof environmentSchema>;
 export const ENVIRONMENT = Symbol('ENVIRONMENT');
 
 export function loadWorkspaceEnvironment(): void {
-  const candidates = [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')];
+  const inheritedKeys = new Set(Object.keys(process.env));
+  let directory = resolve(process.cwd());
+  const candidates: string[] = [];
+  while (true) {
+    const candidate = resolve(directory, '.env');
+    if (existsSync(candidate)) candidates.push(candidate);
+    const parent = dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
 
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      const fileEnvironment = parseEnv(readFileSync(candidate, 'utf8'));
-      for (const [key, value] of Object.entries(fileEnvironment)) {
-        process.env[key] ??= value;
-      }
-      return;
+  for (const candidate of candidates.reverse()) {
+    const fileEnvironment = parseEnv(readFileSync(candidate, 'utf8'));
+    for (const [key, value] of Object.entries(fileEnvironment)) {
+      if (!inheritedKeys.has(key)) process.env[key] = value;
     }
   }
 }

@@ -9,9 +9,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 PROJECT_ROOT = Path(__file__).resolve().parents[6]
 
 
+def workspace_env_file() -> Path:
+    for directory in Path.cwd().parents:
+        candidate = directory / ".env"
+        if candidate.exists():
+            return candidate
+    return PROJECT_ROOT / ".env"
+
+
 class DatabaseSettings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(Path.cwd() / ".env", PROJECT_ROOT / ".env"),
+        env_file=workspace_env_file(),
         env_file_encoding="utf-8",
         extra="ignore",
     )

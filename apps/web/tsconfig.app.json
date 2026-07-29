@@ -8,6 +8,10 @@
     "useDefineForClassFields": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
     "types": ["vite/client", "vitest/globals"]
   },
   "include": ["src"]
