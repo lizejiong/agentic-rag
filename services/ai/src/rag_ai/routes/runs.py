@@ -1,4 +1,6 @@
 from collections.abc import AsyncIterator
+import asyncio
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
@@ -15,6 +17,7 @@ from rag_ai.settings import get_worker_settings
 from rag_ai.streaming.ndjson import encode_ndjson
 
 router = APIRouter(prefix="/v1/agent/runs", tags=["agent-runs"])
+logger = logging.getLogger(__name__)
 
 _agent: Agent | None = None
 _memory_store: RedisSessionMemoryStore | None = None
@@ -54,29 +57,33 @@ async def _load_space_policies(space_ids: list[UUID], acl: AclSnapshot) -> list[
     This keeps NestJS as the authorization source while letting Python decide
     retrieval strategy based on space configuration.
     """
-    from sqlalchemy import text
-    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy import create_engine, text
 
     settings = get_worker_settings()
-    engine = create_async_engine(settings.async_sqlalchemy_url, pool_pre_ping=True)
     allowed_space_ids = [sid for sid in space_ids if acl.can_view_space(sid)]
     policies: list[SpacePolicy] = []
     if not allowed_space_ids:
         return policies
 
-    async with engine.connect() as connection:
-        result = await connection.execute(
-            text(
-                """
-                SELECT id, embedding_enabled, reranker_enabled, llm_enabled
-                FROM app.knowledge_spaces
-                WHERE id = ANY(:space_ids)
-                """
-            ),
-            {"space_ids": allowed_space_ids},
-        )
-        rows = result.mappings().all()
-    await engine.dispose()
+    def load_rows():
+        engine = create_engine(settings.sqlalchemy_url, pool_pre_ping=True)
+        try:
+            with engine.connect() as connection:
+                result = connection.execute(
+                    text(
+                        """
+                        SELECT id, embedding_enabled, reranker_enabled, llm_enabled
+                        FROM app.knowledge_spaces
+                        WHERE id = ANY(:space_ids)
+                        """
+                    ),
+                    {"space_ids": allowed_space_ids},
+                )
+                return result.mappings().all()
+        finally:
+            engine.dispose()
+
+    rows = await asyncio.to_thread(load_rows)
 
     for row in rows:
         policies.append(
@@ -145,6 +152,9 @@ async def run_agent(request: ChatRequest) -> StreamingResponse:
                 yield encode_ndjson(event)
                 if event.type == "text.delta":
                     answer_parts.append(event.text)
+        except Exception:
+            logger.exception("AI run failed", extra={"request_id": str(request.requestId)})
+            raise
         finally:
             run_registry.release(request.requestId, cancellation_event)
             # Persist this turn to session memory (best-effort).

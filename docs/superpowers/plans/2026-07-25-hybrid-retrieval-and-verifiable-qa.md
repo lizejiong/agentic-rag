@@ -117,11 +117,11 @@ start -> load_memory -> understand_query -> decide_route -> retrieve -> merge_ev
 
 - [ ] Recall@10 ≥ 0.85、nDCG@10 ≥ 0.75 在 fixture 评测集上成立（使用确定性 embedding 的语义测试集）。
 - [ ] 引用准确率 ≥ 0.95（每个 citation 指向真实存在的块）。
-- [ ] 无 ACL 越权：禁用/撤权文档不可召回，引用解析返回无权访问。
-- [ ] 证据不足案例返回 `INSUFFICIENT_EVIDENCE` 状态，不编造答案。
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` 全部通过。
-- [ ] Python `ruff check`, `mypy`, `pytest` 全部通过。
-- [ ] 三进程 smoke（web/api/ai）问答链路可运行并返回真实检索结果。
+- [x] 无 ACL 越权：禁用/撤权文档不可召回，引用解析返回无权访问。
+- [x] 证据不足案例返回 `INSUFFICIENT_EVIDENCE` 状态，不编造答案。
+- [x] `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` 全部通过。
+- [x] Python `ruff check`, `mypy`, `pytest` 全部通过（2026-07-26）。
+- [x] 三进程 smoke（web/api/ai）问答链路可运行并返回真实检索结果（2026-07-26 真实模型 E2E）。
 
 ---
 
@@ -138,5 +138,7 @@ start -> load_memory -> understand_query -> decide_route -> retrieve -> merge_ev
 - [x] 9. API 层：`/search`、`/citations/:id/resolve`、聊天上下文传递。
 - [x] 10. 前端层：检索摘要和引用 UI。
 - [x] 11. 测试：单元、集成、契约、端到端和 smoke。
-- [ ] 12. 出口检查：运行完整验收命令并记录结果。
+- [x] 12. 评测基础设施：实现 Recall@10、nDCG@10、引用准确率计算及 JSONL 阈值报告运行器。
+- [x] 13. 社区基线：接入 BEIR SciFact，生成可复用的检索问题与 qrels 标注集。
+- [ ] 14. 出口检查：将基线语料导入候选环境，运行完整验收命令并记录结果。
 

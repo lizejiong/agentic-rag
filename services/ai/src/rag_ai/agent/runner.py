@@ -349,8 +349,12 @@ def _summary_to_event(summary: RetrievalSummary) -> dict[str, Any]:
                 "path": path.path,
                 "spaceId": str(path.space_id),
                 "candidatesReturned": path.candidates_returned,
-                "candidatesAfterAcl": path.candidates_after_acl,
-                **({"error": path.error} if path.error else {}),
+                **(
+                    {"candidatesAfterAcl": path.candidates_after_acl}
+                    if path.candidates_after_acl is not None
+                    else {}
+                ),
+                **({"error": path.error} if path.error is not None else {}),
             }
             for path in summary.paths
         ],

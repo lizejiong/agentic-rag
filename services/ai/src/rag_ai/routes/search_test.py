@@ -66,7 +66,8 @@ async def search_test(request: SearchTestRequest) -> SearchTestResponse:
         raise HTTPException(status_code=500, detail="Retrieval failed") from exc
 
     results: list[SearchTestChunk] = []
-    for chunk in chunks[: request.maxResults]:
+    for ranked_chunk in chunks[: request.maxResults]:
+        chunk = ranked_chunk.chunk
         location = None
         if chunk.location:
             location = {
@@ -78,10 +79,10 @@ async def search_test(request: SearchTestRequest) -> SearchTestResponse:
             SearchTestChunk(
                 chunkId=str(chunk.chunk_id),
                 documentId=str(chunk.document_id),
-                documentTitle=chunk.document_title or "",
+                documentTitle=chunk.title,
                 content=chunk.content[:500],
                 score=round(chunk.score, 4),
-                path=chunk.source.value if chunk.source else "unknown",
+                path=chunk.path,
                 location=location,
             )
         )

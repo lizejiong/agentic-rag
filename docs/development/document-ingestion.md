@@ -40,7 +40,7 @@ Run the services in separate terminals:
 ```powershell
 pnpm dev:api
 pnpm dev:ai
-uv run --project services/ai python -m rag_ai.worker_main
+pnpm dev:worker
 pnpm dev:web
 ```
 
