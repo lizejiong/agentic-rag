@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from typing import cast
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, AsyncStream
+from openai.types.chat import ChatCompletionChunk
 
 from rag_ai.models.base import (
     ChatMessage,
@@ -117,13 +119,16 @@ class OpenAIChatModel(ChatModel):
         api_messages = [
             {"role": msg.role, "content": msg.content} for msg in messages
         ]
-        stream = await self._client.chat.completions.create(
-            model=self._model,
-            messages=api_messages,  # type: ignore[arg-type]
-            temperature=temperature,
-            max_tokens=max_tokens,
-            stop=stop or None,
-            stream=True,
+        stream = cast(
+            AsyncStream[ChatCompletionChunk],
+            await self._client.chat.completions.create(
+                model=self._model,
+                messages=api_messages,  # type: ignore[arg-type]
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stop=stop or None,
+                stream=True,
+            ),
         )
         async for chunk in stream:
             delta = chunk.choices[0].delta if chunk.choices else None
