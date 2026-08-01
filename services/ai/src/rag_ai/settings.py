@@ -74,8 +74,15 @@ class WorkerSettings(DatabaseSettings):
     elasticsearch_index: str = Field(default="atlas_chunks", min_length=1, max_length=120)
 
     # OpenAI-compatible API credentials. Read from .env or environment.
+    # embedding_api_key / embedding_base_url override the shared values below
+    # so that embedding and chat can target different providers (e.g. SiliconFlow
+    # for BGE-M3 and DeepSeek official for chat).
     openai_api_key: str = Field(default="", min_length=0)
     openai_base_url: str = Field(default="", min_length=0)
+    embedding_api_key: str = Field(default="", min_length=0)
+    embedding_base_url: str = Field(default="", min_length=0)
+    llm_api_key: str = Field(default="", min_length=0)
+    llm_base_url: str = Field(default="", min_length=0)
 
     # Short-term memory.
     memory_window_turns: int = Field(default=10, ge=0, le=100)

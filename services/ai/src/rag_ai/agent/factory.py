@@ -24,8 +24,8 @@ def build_retrieval_service(
         provider=settings.embedding_provider,
         dimensions=settings.embedding_dimensions,
         version=settings.embedding_version,
-        api_key=settings.openai_api_key,
-        base_url=settings.openai_base_url,
+        api_key=settings.embedding_api_key or settings.openai_api_key,
+        base_url=settings.embedding_base_url or settings.openai_base_url,
     )
     rerank = reranker or create_reranker(
         provider=settings.reranker_provider,
@@ -77,7 +77,7 @@ def build_agent(
         chat=chat or create_chat_model(
             provider=settings.llm_provider,
             version=settings.llm_version,
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url,
+            api_key=settings.llm_api_key or settings.openai_api_key,
+            base_url=settings.llm_base_url or settings.openai_base_url,
         ),
     )
