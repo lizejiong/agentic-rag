@@ -60,6 +60,9 @@ class ChatMessage:
     content: str
 
 
+from collections.abc import AsyncIterator
+
+
 @dataclass(frozen=True)
 class ChatResponse:
     content: str
@@ -76,6 +79,21 @@ class ChatModel(ABC):
         max_tokens: int = 2048,
         stop: list[str] | None = None,
     ) -> ChatResponse: ...
+
+    async def astream(
+        self,
+        messages: list[ChatMessage],
+        *,
+        temperature: float = 0.3,
+        max_tokens: int = 2048,
+        stop: list[str] | None = None,
+    ) -> AsyncIterator[str]:
+        """Stream response tokens.  Defaults to char-by-char over ``achat``."""
+        response = await self.achat(
+            messages, temperature=temperature, max_tokens=max_tokens, stop=stop
+        )
+        for char in response.content:
+            yield char
 
     @property
     @abstractmethod

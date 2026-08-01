@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 from openai import AsyncOpenAI
 
 from rag_ai.models.base import (
@@ -103,3 +105,27 @@ class OpenAIChatModel(ChatModel):
                 "completion_tokens": response.usage.completion_tokens if response.usage else 0,
             },
         )
+
+    async def astream(
+        self,
+        messages: list[ChatMessage],
+        *,
+        temperature: float = 0.3,
+        max_tokens: int = 2048,
+        stop: list[str] | None = None,
+    ) -> AsyncIterator[str]:
+        api_messages = [
+            {"role": msg.role, "content": msg.content} for msg in messages
+        ]
+        stream = await self._client.chat.completions.create(
+            model=self._model,
+            messages=api_messages,  # type: ignore[arg-type]
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stop=stop or None,
+            stream=True,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content

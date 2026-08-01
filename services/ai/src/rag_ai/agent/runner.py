@@ -238,42 +238,55 @@ class Agent:
         seq += 1
 
         llm_enabled = any(policy.llm_enabled for policy in state.policies)
+        num_to_id: dict[str, str] = {}
         if llm_enabled:
-            prompt = _build_prompt(query, ranked)
+            prompt, num_to_id = _build_prompt(query, ranked)
             messages = effective_history + [ChatMessage(role="user", content=prompt)]
-            response = await self._chat.achat(messages)
-            answer = response.content
+            answer_parts: list[str] = []
+            async for token in self._chat.astream(messages):
+                check_cancel()
+                answer_parts.append(token)
+                yield TextDelta(
+                    requestId=state.request_id,
+                    traceId=state.trace_id,
+                    seq=seq,
+                    occurredAt=datetime.now(timezone.utc),
+                    type="text.delta",
+                    text=token,
+                )
+                seq += 1
+            answer = "".join(answer_parts)
         else:
-            answer = _build_fallback_answer(ranked)
+            answer = _build_fallback_answer(ranked, num_to_id)
 
         state.answer = answer
-        citation_map = _extract_citations(answer)
-        # Ensure every referenced citation exists; drop unknown ones.
-        valid_ids = {str(item.chunk.chunk_id) for item in ranked}
+        citation_pairs = _extract_numeric_citations(answer)
+        # Map numeric citations [1] [2] … back to chunk UUIDs.
         citation_map = [
-            (text, cid) for text, cid in citation_map if cid in valid_ids
+            (text, num_to_id[num])
+            for text, num in citation_pairs
+            if num in num_to_id
         ]
 
-        # If the generator did not produce citations, append them explicitly.
+        # If the model did not produce citations, append them explicitly.
         if not citation_map:
             citation_map = [
                 (item.chunk.content[:120], str(item.chunk.chunk_id)) for item in ranked[:5]
             ]
             answer = _attach_citations(answer, citation_map)
             state.answer = answer
-
-        # Stream answer text in small chunks.
-        for char in answer:
-            check_cancel()
-            yield TextDelta(
-                requestId=state.request_id,
-                traceId=state.trace_id,
-                seq=seq,
-                occurredAt=datetime.now(timezone.utc),
-                type="text.delta",
-                text=char,
-            )
-            seq += 1
+            # Re-emit the augmented answer that now includes citations.
+            for char in answer:
+                check_cancel()
+                yield TextDelta(
+                    requestId=state.request_id,
+                    traceId=state.trace_id,
+                    seq=seq,
+                    occurredAt=datetime.now(timezone.utc),
+                    type="text.delta",
+                    text=char,
+                )
+                seq += 1
 
         # Emit citation data parts for unique referenced chunks.
         emitted: set[str] = set()
@@ -368,45 +381,54 @@ def _summary_to_event(summary: RetrievalSummary) -> dict[str, Any]:
     }
 
 
-def _build_prompt(query: str, ranked: list[RankedChunk]) -> str:
+def _build_prompt(query: str, ranked: list[RankedChunk]) -> tuple[str, dict[str, str]]:
+    """Build the LLM prompt with numbered evidence and return (prompt, num→chunk_id map)."""
+    num_to_id: dict[str, str] = {}
     lines = [f"Question: {query}", "", "Evidence:"]
-    for item in ranked[:10]:
+    for index, item in enumerate(ranked[:10], start=1):
         chunk = item.chunk
-        lines.append(f"[{chunk.chunk_id}] {chunk.content}")
-    lines.append("")
-    lines.append(
-        "Answer the question using only the evidence above. "
-        "Cite each factual statement with [chunk_id] in the same format as the evidence. "
-        "If the evidence is insufficient, say so."
-    )
-    return "\n".join(lines)
+        num_to_id[str(index)] = str(chunk.chunk_id)
+        lines.append(f"[{index}] {chunk.content}")
+    lines.extend([
+        "",
+        "Instructions:",
+        "1. Answer the question based ONLY on the evidence above.",
+        "2. Summarise and synthesise — do NOT copy-paste raw evidence.",
+        "3. Ignore formatting noise: ::: markers, icon: prefixes, layout hints, and similar markup. Extract the underlying facts.",
+        "4. Organise the answer in clear Chinese prose. Use bullet points only when listing multiple items.",
+        "5. Cite sources with [1] [2] … numbers matching the Evidence above.",
+        "6. If the evidence does not contain the answer, say so directly.",
+    ])
+    return "\n".join(lines), num_to_id
 
 
-def _build_fallback_answer(ranked: list[RankedChunk]) -> str:
+def _build_fallback_answer(
+    ranked: list[RankedChunk], num_to_id: dict[str, str]
+) -> str:
     sentences: list[str] = []
-    for item in ranked[:5]:
+    for index, item in enumerate(ranked[:5], start=1):
         text = item.chunk.content.rstrip("。，,；;").strip()
         if text:
-            sentences.append(f"{text}。[{item.chunk.chunk_id}]")
+            sentences.append(f"{text}。[{index}]")
+            num_to_id[str(index)] = str(item.chunk.chunk_id)
     if not sentences:
         return "根据现有资料无法回答该问题。"
     return " ".join(sentences)
 
 
-def _extract_citations(answer: str) -> list[tuple[str, str]]:
-    """Extract (text_before_citation, citation_id) pairs."""
+def _extract_numeric_citations(answer: str) -> list[tuple[str, str]]:
+    """Extract (text_before_citation, number) pairs for [1] [2] style citations."""
+    import re
     results: list[tuple[str, str]] = []
-    parts = answer.split("[")
-    if not parts:
-        return results
-    current = parts[0]
-    for part in parts[1:]:
-        if "]" not in part:
-            current += "[" + part
-            continue
-        citation_id, _, rest = part.partition("]")
-        results.append((current.strip(), citation_id.strip()))
-        current = rest
+    # Match [1] through [99] at end of sentences/phrases.
+    pattern = re.compile(r"\[(\d{1,2})\](?!\()")
+    prev_end = 0
+    for match in pattern.finditer(answer):
+        num = match.group(1)
+        text = answer[prev_end:match.start()].strip()
+        if text:
+            results.append((text, num))
+        prev_end = match.end()
     return results
 
 
