@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from rag_ai.models.base import RankedCandidate, Reranker
 from rag_ai.models.mock import MockEmbeddingModel, MockReranker
 from rag_ai.retrieval.fusion import reciprocal_rank_fusion
 from rag_ai.retrieval.models import (
@@ -108,6 +109,21 @@ class FakeLexicalRepository:
         ][:top_k]
 
 
+class FailingReranker(Reranker):
+    @property
+    def model_name(self) -> str:
+        return "failing"
+
+    @property
+    def version(self) -> str:
+        return "test"
+
+    async def rerank(
+        self, query: str, candidates: list[tuple[str, str]], *, top_k: int
+    ) -> list[RankedCandidate]:
+        raise TimeoutError("reranker timeout")
+
+
 @pytest.mark.asyncio
 async def test_retrieval_service_filters_by_acl() -> None:
     allowed_space = uuid4()
@@ -178,3 +194,24 @@ async def test_retrieval_service_skips_vector_when_disabled() -> None:
 
     assert not vector_calls
     assert lexical_calls
+
+
+@pytest.mark.asyncio
+async def test_retrieval_service_falls_back_to_rrf_when_reranker_fails() -> None:
+    space_id = uuid4()
+    chunks = [_chunk(1, "first", space_id), _chunk(2, "second", space_id)]
+    service = RetrievalService(
+        vector_repo=FakeVectorRepository(chunks),
+        lexical_repo=FakeLexicalRepository(chunks),
+        embedding_model=MockEmbeddingModel(dimensions=16),
+        reranker=FailingReranker(),
+        options=RetrievalOptions(rerank_top_k=1),
+    )
+    acl = AclSnapshot(user_id=uuid4(), admin=False, spaces={space_id: "VIEW"})
+
+    ranked, _ = await service.retrieve(
+        "query", [space_id], acl, [SpacePolicy(space_id, True, True, True)]
+    )
+
+    assert len(ranked) == 1
+    assert ranked[0].rerank_score is None
