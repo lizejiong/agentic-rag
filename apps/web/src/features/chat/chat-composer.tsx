@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { Send, Square } from 'lucide-react';
 
@@ -21,6 +21,7 @@ export function ChatComposer({
   hasSelectedSpaces,
   onSend,
   onStop,
+  scopeControl,
 }: {
   busy: boolean;
   agentStatus: string | undefined;
@@ -30,6 +31,7 @@ export function ChatComposer({
   hasSelectedSpaces: boolean;
   onSend: (text: string) => void | Promise<void>;
   onStop: () => void | Promise<void>;
+  scopeControl?: ReactNode;
 }) {
   const [input, setInput] = useState('');
   const submit = () => {
@@ -40,23 +42,23 @@ export function ChatComposer({
   };
 
   return (
-    <div className="shrink-0 bg-white px-6 pb-4 pt-2">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-1 flex min-h-5 items-center gap-2 text-xs text-slate-500" aria-live="polite">
+    <div className="shrink-0 bg-transparent px-8 pb-6 pt-3">
+      <div className="mx-auto w-full max-w-4xl">
+        <div className="mb-2 flex min-h-4 items-center gap-2 px-1 text-xs text-slate-500" aria-live="polite">
           {busy ? <span className="size-1.5 animate-pulse rounded-full bg-blue-600" aria-hidden="true" /> : null}
           {agentStatus
             ? STATUS_LABELS[agentStatus] ?? agentStatus
             : busy
               ? '正在连接知识服务'
-              : '回答会附带可核验的引用来源'}
+              : null}
         </div>
-        {error ? <p className="mb-2 text-sm text-red-600" role="alert">{error.message}</p> : null}
+        {error ? <p className="mb-2 text-sm text-red-600" role="alert">服务连接已中断，请确认 API 服务后重试。</p> : null}
         {spaceError ? <p className="mb-2 text-sm text-red-600" role="alert">{spaceError}</p> : null}
         {!spacesLoading && !hasSelectedSpaces ? (
           <p className="mb-2 text-sm text-amber-700" role="status">请至少选择一个知识空间后再提问。</p>
         ) : null}
         <form
-          className="rounded-2xl border border-slate-300 bg-white p-3 shadow-sm focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100"
+          className="rounded-2xl border border-slate-200 bg-white p-4 shadow-lg shadow-slate-200/40 transition focus-within:border-blue-300 focus-within:ring-4 focus-within:ring-blue-50"
           onSubmit={(event) => {
             event.preventDefault();
             submit();
@@ -69,7 +71,7 @@ export function ChatComposer({
             value={input}
             maxLength={8000}
             placeholder="例如：请总结差旅报销制度，并给出原文出处"
-            className="block w-full resize-none border-0 bg-transparent px-1 text-sm leading-6 text-slate-800 outline-none placeholder:text-slate-400"
+            className="block min-h-14 w-full resize-none border-0 bg-transparent px-1 text-[15px] leading-7 text-slate-800 outline-none placeholder:text-slate-400"
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
@@ -78,8 +80,8 @@ export function ChatComposer({
               }
             }}
           />
-          <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2">
-            <small className="text-xs text-slate-400">Enter 发送 · Shift + Enter 换行</small>
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+            <div className="min-w-0">{scopeControl}</div>
             {busy ? (
               <Button type="button" variant="outline" size="sm" onClick={() => void onStop()}>
                 <Square className="size-3" aria-hidden="true" />
@@ -93,7 +95,6 @@ export function ChatComposer({
             )}
           </div>
         </form>
-        <p className="mt-2 text-center text-xs text-slate-400">AI 生成内容可能存在偏差，请核对引用来源。</p>
       </div>
     </div>
   );
