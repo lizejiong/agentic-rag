@@ -1,37 +1,34 @@
-import { Bot, UserRound } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 import type { RagUIMessage } from '@rag/contracts';
 
 import { MessagePart } from './message-part';
 
 export function ConversationView({ messages }: { messages: RagUIMessage[] }) {
+  const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const shouldFollowRef = useRef(true);
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (container && shouldFollowRef.current) container.scrollTo({ top: container.scrollHeight });
+  }, [messages]);
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto bg-white px-6 py-6" aria-live="polite">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-7">
+    <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/40 px-8 py-7" aria-live="polite" onScroll={(event) => { const target = event.currentTarget; shouldFollowRef.current = target.scrollHeight - target.scrollTop - target.clientHeight < 72; }} ref={scrollRef}>
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
         {messages.length === 0 ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center py-20 text-center">
-            <p className="text-sm text-slate-400">从已选择的知识空间开始提问</p>
-          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center py-20 text-center" />
         ) : (
           messages.map((message) => (
             <article
-              className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               key={message.id}
               data-role={message.role}
             >
-              <span
-                className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
-                  message.role === 'user' ? 'bg-slate-700 text-white' : 'bg-blue-700 text-white'
-                }`}
-                aria-hidden="true"
-              >
-                {message.role === 'user' ? <UserRound className="size-4" /> : <Bot className="size-4" />}
-              </span>
               <div
-                className={`min-w-0 max-w-[86%] rounded-2xl px-4 py-3 text-sm leading-6 ${
+                className={`min-w-0 text-sm leading-7 ${
                   message.role === 'user'
-                    ? 'bg-slate-100 text-slate-800'
-                    : 'text-slate-700'
+                    ? 'max-w-[72%] rounded-2xl bg-slate-100 px-4 py-3 text-slate-800'
+                    : 'w-full text-slate-700'
                 }`}
               >
                 {message.parts.map((part, index) => (
@@ -41,6 +38,7 @@ export function ConversationView({ messages }: { messages: RagUIMessage[] }) {
             </article>
           ))
         )}
+        <div ref={endRef} />
       </div>
     </div>
   );

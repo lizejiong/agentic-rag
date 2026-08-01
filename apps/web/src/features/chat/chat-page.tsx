@@ -11,8 +11,10 @@ import type { VisibleSpace } from '../spaces/space-contract';
 import { useSpacesQuery } from '../spaces/use-spaces-query';
 import { ChatComposer } from './chat-composer';
 import { createChatTransport } from './chat-transport';
+import { ChatWorkspaceErrorBoundary } from './chat-workspace-error-boundary';
 import { ConversationView } from './conversation-view';
 import { SpaceScopeSelector } from './space-scope-selector';
+import { useThrottledMessages } from './use-throttled-messages';
 
 type BrowserConversation = {
   id: string;
@@ -24,6 +26,7 @@ export function ChatPage() {
   const spacesQuery = useSpacesQuery(auth.authorizedFetch);
   const spaces = spacesQuery.data ?? [];
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([]);
+  const hasInitializedSpaces = useRef(false);
   const [conversations, setConversations] = useState<BrowserConversation[]>([
     { id: crypto.randomUUID(), label: '当前对话 1' },
   ]);
@@ -47,17 +50,19 @@ export function ChatPage() {
       const stillVisible = current.filter((id) =>
         spacesQuery.data.some((space) => space.id === id),
       );
-      return stillVisible.length > 0
-        ? stillVisible
-        : spacesQuery.data.map((space) => space.id);
+      if (!hasInitializedSpaces.current) {
+        hasInitializedSpaces.current = true;
+        return spacesQuery.data.map((space) => space.id);
+      }
+      return stillVisible;
     });
   }, [spacesQuery.data]);
 
   return (
-    <main className="flex h-full min-h-0 bg-white">
+    <main className="flex h-full min-h-0 bg-slate-50/40">
       <div className="flex h-full min-h-0 w-full overflow-hidden">
-        <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 bg-slate-50/70 p-3">
-          <div className="px-1 pb-2">
+        <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-slate-50/70 p-3">
+          <div className="px-2 pb-3">
             <p className="text-sm font-semibold text-slate-900">会话</p>
             <p className="mt-1 text-xs text-slate-500">仅保存在当前浏览器</p>
           </div>
@@ -70,14 +75,14 @@ export function ChatPage() {
             <Plus className="size-4" aria-hidden="true" />
             新建对话
           </Button>
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-1 overflow-y-auto">
             {conversations.map((conversation) => {
               const active = conversation.id === activeConversationId;
               return (
                 <button
                   key={conversation.id}
                   type="button"
-                  className={`w-full rounded-md border px-3 py-3 text-left ${
+                  className={`w-full rounded-lg border px-3 py-2.5 text-left ${
                     active
                       ? 'border-blue-100 bg-blue-50'
                       : 'border-transparent bg-transparent hover:border-slate-200 hover:bg-white'
@@ -102,18 +107,20 @@ export function ChatPage() {
             内容仅会从你有访问权限的知识空间中检索。
           </div>
         </aside>
-        {conversations.map((conversation) => (
-          <ChatSession
-            key={conversation.id}
-            auth={auth}
-            hidden={conversation.id !== activeConversationId}
-            spaces={spaces}
-            selectedSpaceIds={selectedSpaceIds}
-            setSelectedSpaceIds={setSelectedSpaceIds}
-            spacesLoading={spacesQuery.isPending}
-            spacesError={spacesQuery.isError}
-          />
-        ))}
+        <ChatWorkspaceErrorBoundary>
+          {conversations.map((conversation) => (
+            <ChatSession
+              key={conversation.id}
+              auth={auth}
+              hidden={conversation.id !== activeConversationId}
+              spaces={spaces}
+              selectedSpaceIds={selectedSpaceIds}
+              setSelectedSpaceIds={setSelectedSpaceIds}
+              spacesLoading={spacesQuery.isPending}
+              spacesError={spacesQuery.isError}
+            />
+          ))}
+        </ChatWorkspaceErrorBoundary>
       </div>
     </main>
   );
@@ -154,6 +161,7 @@ function ChatSession({
       if (part.type === 'data-agent-status') setAgentStatus(part.data.status);
     },
   });
+  const displayedMessages = useThrottledMessages(messages);
   const busy = status === 'submitted' || status === 'streaming';
 
   return (
@@ -161,15 +169,7 @@ function ChatSession({
       className={`min-w-0 flex-1 flex-col ${hidden ? 'hidden' : 'flex'}`}
       aria-label="知识问答对话"
     >
-      <header className="flex shrink-0 justify-end border-b border-slate-100 px-6 py-3">
-        <SpaceScopeSelector
-          spaces={spaces}
-          selectedIds={selectedSpaceIds}
-          loading={spacesLoading}
-          onChange={setSelectedSpaceIds}
-        />
-      </header>
-      <ConversationView messages={messages} />
+      <ConversationView messages={displayedMessages} />
       <ChatComposer
         busy={busy}
         agentStatus={agentStatus}
@@ -182,6 +182,7 @@ function ChatSession({
           return sendMessage({ text });
         }}
         onStop={stop}
+        scopeControl={<SpaceScopeSelector spaces={spaces} selectedIds={selectedSpaceIds} loading={spacesLoading} onChange={setSelectedSpaceIds} />}
       />
     </section>
   );
