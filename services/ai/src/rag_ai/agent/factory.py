@@ -31,6 +31,10 @@ def build_retrieval_service(
         provider=settings.reranker_provider,
         dimensions=settings.embedding_dimensions,
         version=settings.reranker_version,
+        api_key=settings.reranker_api_key,
+        base_url=settings.reranker_base_url,
+        timeout_seconds=settings.reranker_timeout_seconds,
+        instruct=settings.reranker_instruct,
     )
     from elasticsearch import AsyncElasticsearch
 

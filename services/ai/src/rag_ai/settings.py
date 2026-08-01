@@ -51,8 +51,18 @@ class WorkerSettings(DatabaseSettings):
     embedding_dimensions: int = Field(default=384, ge=2, le=4_096)
     embedding_version: str = Field(default="mock-1", min_length=1, max_length=40)
 
-    reranker_provider: str = Field(default="mock", pattern=r"^(none|mock|cohere)$")
+    reranker_provider: str = Field(
+        default="mock", pattern=r"^(none|mock|bailian|siliconflow)$"
+    )
     reranker_version: str = Field(default="mock-1", min_length=1, max_length=40)
+    reranker_api_key: str = Field(default="", min_length=0)
+    reranker_base_url: str = Field(default="", min_length=0)
+    reranker_timeout_seconds: float = Field(default=15.0, ge=1.0, le=120.0)
+    reranker_instruct: str = Field(
+        default="Given a web search query, retrieve relevant passages that answer the query.",
+        min_length=1,
+        max_length=500,
+    )
 
     llm_provider: str = Field(default="mock", pattern=r"^(none|mock|openai)$")
     llm_version: str = Field(default="mock-1", min_length=1, max_length=40)

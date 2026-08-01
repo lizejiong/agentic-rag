@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
 from rag_ai.models.base import EmbeddingModel, Reranker
-from rag_ai.retrieval.fusion import reciprocal_rank_fusion
+from rag_ai.retrieval.fusion import FusionResult, reciprocal_rank_fusion
 from rag_ai.retrieval.lexical_repository import LexicalRepository
 from rag_ai.retrieval.models import (
     AclSnapshot,
@@ -18,6 +19,8 @@ from rag_ai.retrieval.models import (
     SpacePolicy,
 )
 from rag_ai.retrieval.vector_repository import VectorRepository
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -85,31 +88,33 @@ class RetrievalService:
             candidates_for_rerank = [
                 (str(item.chunk.chunk_id), item.chunk.content) for item in fused
             ]
-            reranked = await self._reranker.rerank(
-                query, candidates_for_rerank, top_k=options.rerank_top_k
-            )
-            rerank_ids = {item.chunk_id for item in reranked}
-            final_chunks = []
-            for item in fused:
-                if str(item.chunk.chunk_id) in rerank_ids:
-                    rank_item = next(
-                        (r for r in reranked if r.chunk_id == str(item.chunk.chunk_id)), None
-                    )
-                    final_chunks.append(
-                        RankedChunk(
-                            chunk=item.chunk,
-                            rrf_score=item.rrf_score,
-                            rerank_score=rank_item.score if rank_item else None,
+            try:
+                reranked = await self._reranker.rerank(
+                    query, candidates_for_rerank, top_k=options.rerank_top_k
+                )
+            except Exception:
+                logger.warning("Reranker failed; returning RRF results", exc_info=True)
+                final_chunks = self._rrf_chunks(fused, options.rerank_top_k)
+            else:
+                rerank_ids = {item.chunk_id for item in reranked}
+                final_chunks = []
+                for item in fused:
+                    if str(item.chunk.chunk_id) in rerank_ids:
+                        rank_item = next(
+                            (r for r in reranked if r.chunk_id == str(item.chunk.chunk_id)), None
                         )
-                    )
-            # Preserve reranker ordering.
-            order = {item.chunk_id: index for index, item in enumerate(reranked)}
-            final_chunks.sort(key=lambda rc: order.get(str(rc.chunk.chunk_id), len(order)))
+                        final_chunks.append(
+                            RankedChunk(
+                                chunk=item.chunk,
+                                rrf_score=item.rrf_score,
+                                rerank_score=rank_item.score if rank_item else None,
+                            )
+                        )
+                # Preserve reranker ordering.
+                order = {item.chunk_id: index for index, item in enumerate(reranked)}
+                final_chunks.sort(key=lambda rc: order.get(str(rc.chunk.chunk_id), len(order)))
         else:
-            final_chunks = [
-                RankedChunk(chunk=item.chunk, rrf_score=item.rrf_score)
-                for item in fused[: options.rerank_top_k]
-            ]
+            final_chunks = self._rrf_chunks(fused, options.rerank_top_k)
 
         elapsed_ms = (time.perf_counter() - started) * 1000
         summary = RetrievalSummary(
@@ -130,6 +135,13 @@ class RetrievalService:
             elapsed_ms=elapsed_ms,
         )
         return final_chunks, summary
+
+    @staticmethod
+    def _rrf_chunks(fused: list[FusionResult], top_k: int) -> list[RankedChunk]:
+        return [
+            RankedChunk(chunk=item.chunk, rrf_score=item.rrf_score)
+            for item in fused[:top_k]
+        ]
 
     async def _run_vector(
         self,
