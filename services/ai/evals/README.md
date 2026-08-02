@@ -52,3 +52,15 @@ uv run --project services/ai python services/ai/scripts/evaluate_retrieval.py --
 ```
 
 该检查衡量“系统引用的论文是否属于标注相关论文”，不能证明每一句答案都被逐字支持。最终引用准确率仍应使用 HotpotQA 支持事实或人工标注样本。
+
+## 星桥云途中文验收集
+
+项目还提供一套不依赖外部下载的中文固定验收资料：`services/ai/evals/fixtures/xingqiao-acceptance/`。
+
+它包含 20 个虚构互联网公司文件和 25 道固定问题。管理员先在 Web 的“评测中心”创建数据集、绑定一个隔离知识空间，再导入 `cases.jsonl`；测试文件仍从绑定空间的文档页上传。题目和每次运行结果保存到数据库，不依赖代码目录自动发现。
+
+```powershell
+uv run --project services/ai python services/ai/scripts/generate_xingqiao_acceptance_files.py --output services/ai/evals/fixtures/xingqiao-acceptance/files
+```
+
+上传 `files/` 下全部 20 个文件，等待都处理完成后回到 `/evaluation` 运行。页面可选择“完整验收”查看回答质量和引用，或选择更快的“检索诊断”查看 Vector、ES、RRF、Reranker 每层的候选与指标；下载 JSON 仍可按实验编号另存。

@@ -56,6 +56,7 @@ class RetrievalSummary:
     reranker_model: str = ""
     reranker_version: str = ""
     elapsed_ms: float = 0.0
+    trace: RetrievalTrace | None = None
 
 
 @dataclass(frozen=True)
@@ -103,3 +104,25 @@ class RankedChunk:
     chunk: RetrievedChunk
     rrf_score: float | None = None
     rerank_score: float | None = None
+
+
+@dataclass(frozen=True)
+class RetrievalTraceItem:
+    """One candidate as it appeared at a retrieval stage."""
+
+    chunk: RetrievedChunk
+    rank: int
+    score: float | None = None
+    vector_rank: int | None = None
+    lexical_rank: int | None = None
+    rrf_score: float | None = None
+    rerank_score: float | None = None
+
+
+@dataclass(frozen=True)
+class RetrievalTrace:
+    vector: list[RetrievalTraceItem] = field(default_factory=list)
+    lexical: list[RetrievalTraceItem] = field(default_factory=list)
+    rrf: list[RetrievalTraceItem] = field(default_factory=list)
+    rerank: list[RetrievalTraceItem] = field(default_factory=list)
+    rerank_note: str | None = None

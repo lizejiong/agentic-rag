@@ -1,4 +1,4 @@
-import { BarChart3, Database, LogOut, MessageSquare, Settings } from 'lucide-react';
+import { BarChart3, Database, FlaskConical, LogOut, MessageSquare, Settings } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ export function PcAppShell() {
             <span className="text-sm font-semibold tracking-tight">Atlas RAG</span>
           </NavLink>
           <nav className="flex h-full items-center gap-1" aria-label="主导航">
-            {navigation.map(({ to, label, icon: Icon, end }) => (
+            {[...navigation, ...(auth.user?.role === 'ADMIN' ? [{ to: '/evaluation', label: '评测中心', icon: FlaskConical }] : [])].map(({ to, label, icon: Icon, end }) => (
               <NavLink
                 className={({ isActive }) =>
                   `flex h-full items-center gap-2 border-b-2 px-4 text-sm transition-colors ${

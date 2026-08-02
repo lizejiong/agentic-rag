@@ -15,6 +15,8 @@ from rag_ai.retrieval.models import (
     RankedChunk,
     RetrievalPathSummary,
     RetrievalSummary,
+    RetrievalTrace,
+    RetrievalTraceItem,
     RetrievedChunk,
     SpacePolicy,
 )
@@ -84,6 +86,7 @@ class RetrievalService:
 
         reranker_enabled = any(policy.reranker_enabled for policy in policies)
         final_chunks: list[RankedChunk]
+        rerank_note: str | None = None
         if reranker_enabled and fused:
             candidates_for_rerank = [
                 (str(item.chunk.chunk_id), item.chunk.content) for item in fused
@@ -95,6 +98,7 @@ class RetrievalService:
             except Exception:
                 logger.warning("Reranker failed; returning RRF results", exc_info=True)
                 final_chunks = self._rrf_chunks(fused, options.rerank_top_k)
+                rerank_note = "Reranker 调用失败，已回退为 RRF 排名。"
             else:
                 rerank_ids = {item.chunk_id for item in reranked}
                 final_chunks = []
@@ -115,6 +119,47 @@ class RetrievalService:
                 final_chunks.sort(key=lambda rc: order.get(str(rc.chunk.chunk_id), len(order)))
         else:
             final_chunks = self._rrf_chunks(fused, options.rerank_top_k)
+            rerank_note = "当前知识空间未启用 Reranker，沿用 RRF 排名。"
+
+        fusion_by_id = {item.chunk_id: item for item in fused}
+        trace = RetrievalTrace(
+            vector=[
+                RetrievalTraceItem(chunk=chunk, rank=rank, score=chunk.score)
+                for rank, chunk in enumerate(vector_results, start=1)
+            ],
+            lexical=[
+                RetrievalTraceItem(chunk=chunk, rank=rank, score=chunk.score)
+                for rank, chunk in enumerate(lexical_results, start=1)
+            ],
+            rrf=[
+                RetrievalTraceItem(
+                    chunk=item.chunk,
+                    rank=rank,
+                    score=item.rrf_score,
+                    vector_rank=item.vector_rank,
+                    lexical_rank=item.lexical_rank,
+                    rrf_score=item.rrf_score,
+                )
+                for rank, item in enumerate(fused, start=1)
+            ],
+            rerank=[
+                RetrievalTraceItem(
+                    chunk=item.chunk,
+                    rank=rank,
+                    score=item.rerank_score if item.rerank_score is not None else item.rrf_score,
+                    vector_rank=fusion_by_id[item.chunk.chunk_id].vector_rank
+                    if item.chunk.chunk_id in fusion_by_id
+                    else None,
+                    lexical_rank=fusion_by_id[item.chunk.chunk_id].lexical_rank
+                    if item.chunk.chunk_id in fusion_by_id
+                    else None,
+                    rrf_score=item.rrf_score,
+                    rerank_score=item.rerank_score,
+                )
+                for rank, item in enumerate(final_chunks, start=1)
+            ],
+            rerank_note=rerank_note,
+        )
 
         elapsed_ms = (time.perf_counter() - started) * 1000
         summary = RetrievalSummary(
@@ -133,8 +178,22 @@ class RetrievalService:
             reranker_model=self._reranker.model_name if reranker_enabled else "",
             reranker_version=self._reranker.version if reranker_enabled else "",
             elapsed_ms=elapsed_ms,
+            trace=trace,
         )
         return final_chunks, summary
+
+    async def retrieve_with_trace(
+        self,
+        query: str,
+        space_ids: list[UUID],
+        acl: AclSnapshot,
+        policies: list[SpacePolicy],
+    ) -> tuple[list[RankedChunk], RetrievalSummary, RetrievalTrace]:
+        """Return the exact trace produced by one production retrieval run."""
+        final_chunks, summary = await self.retrieve(query, space_ids, acl, policies)
+        if summary.trace is None:
+            raise RuntimeError("Retrieval trace was not produced")
+        return final_chunks, summary, summary.trace
 
     @staticmethod
     def _rrf_chunks(fused: list[FusionResult], top_k: int) -> list[RankedChunk]:

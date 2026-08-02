@@ -1,0 +1,6 @@
+{
+  "id": "xingqiao-acceptance",
+  "title": "星桥云途验收集",
+  "targetSpaceName": "星桥云途验收空间",
+  "casesFile": "cases.jsonl"
+}

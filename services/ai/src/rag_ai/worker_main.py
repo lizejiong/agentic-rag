@@ -46,8 +46,8 @@ async def run_worker() -> None:
         provider=settings.embedding_provider,
         dimensions=settings.embedding_dimensions,
         version=settings.embedding_version,
-        api_key=settings.openai_api_key,
-        base_url=settings.openai_base_url,
+        api_key=settings.embedding_api_key or settings.openai_api_key,
+        base_url=settings.embedding_base_url or settings.openai_base_url,
     )
     lexical_repo = LexicalRepository(
         AsyncElasticsearch(settings.elasticsearch_url),
