@@ -60,7 +60,7 @@ async def test_rerank_includes_optional_instruction_siliconflow() -> None:
         api_key="test-key",
         base_url="https://api.siliconflow.cn/v1/rerank",
         model="Qwen/Qwen3-Reranker-8B",
-        instruction="Prefer exact answers.",
+        instruct="Prefer exact answers.",
         transport=httpx.MockTransport(handler),
     )
 

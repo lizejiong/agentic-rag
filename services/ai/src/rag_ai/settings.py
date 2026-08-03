@@ -77,6 +77,26 @@ class WorkerSettings(DatabaseSettings):
     retrieval_rrf_k: int = Field(default=60, ge=1, le=1_000)
     retrieval_rerank_top_k: int = Field(default=10, ge=1, le=100)
 
+    # ── Evidence selection ──
+    evidence_rerank_min_score: float = Field(default=0.1, ge=0.0, le=1.0)
+    evidence_rrf_min_score: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    evidence_rerank_max_relative_drop: float = Field(default=0.0, ge=0.0, le=1.0)
+    evidence_rerank_absolute_drop: float = Field(default=0.15, ge=0.0, le=1.0)
+    evidence_rrf_max_relative_drop: float = Field(default=0.0, ge=0.0, le=1.0)
+    evidence_rrf_absolute_drop: float = Field(default=0.003, ge=0.0, le=1.0)
+    evidence_cliff_min_chunks: int = Field(default=3, ge=1, le=20)
+
+    evidence_model_name: str = Field(default="gpt-4o", min_length=1)
+    evidence_fallback_encoding: str = Field(default="cl100k_base", min_length=1)
+    evidence_max_evidence_tokens: int = Field(default=4000, ge=100, le=8000)
+    evidence_max_chunk_tokens: int = Field(default=600, ge=50, le=2000)
+    evidence_max_evidence_chunks: int = Field(default=15, ge=1, le=50)
+    evidence_output_reservation: int = Field(default=2048, ge=256, le=4096)
+
+    evidence_max_chunks_per_doc: int = Field(default=2, ge=1, le=10)
+    evidence_jaccard_similarity_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+
     # Elasticsearch connection. When empty, retrieval falls back to pgvector only.
     elasticsearch_url: str = Field(
         default="http://elastic:change-me-elastic@127.0.0.1:9200", min_length=1

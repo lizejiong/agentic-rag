@@ -20,6 +20,7 @@ from rag_ai.contracts.agent_events import (
     TextDelta,
 )
 from rag_ai.models.base import ChatMessage, ChatModel
+from rag_ai.retrieval.evidence_selector import EvidenceSelector
 from rag_ai.retrieval.models import AclSnapshot, CitationLocation as DomainCitationLocation, RankedChunk, RetrievalSummary, RetrievalTrace, SpacePolicy
 from rag_ai.retrieval.service import RetrievalService
 
@@ -66,11 +67,13 @@ class Agent:
         retrieval: RetrievalService,
         chat: ChatModel,
         *,
+        evidence_selector: EvidenceSelector | None = None,
         evidence_threshold: float = 0.15,
         max_rewrites: int = 1,
     ) -> None:
         self._retrieval = retrieval
         self._chat = chat
+        self._evidence_selector = evidence_selector or EvidenceSelector()
         self._evidence_threshold = evidence_threshold
         self._max_rewrites = max_rewrites
 
@@ -188,7 +191,7 @@ class Agent:
         query = state.query
         effective_history = list(state.history)
 
-        # Simple retrieval loop with optional rewrite.
+        # Retrieval loop with optional rewrite.
         while True:
             check_cancel()
             yield RunStatus(
@@ -229,19 +232,38 @@ class Agent:
             )
             seq += 1
 
-            sufficient = self._assess_evidence(ranked)
+            # ── Evidence selection ──
+            score_type = (
+                "reranker" if summary.reranker_enabled and not summary.reranker_failed
+                else "rrf"
+            )
+            evidence = self._evidence_selector.select(
+                ranked,
+                score_type=score_type,
+                query=query,
+                # TODO: pass actual system / history token counts from prompt builder
+            )
+
+            sufficient = evidence and self._assess_evidence(evidence)
             if not sufficient and state.rewrite_count < self._max_rewrites:
                 state.rewrite_count += 1
                 rewritten = await self._rewrite_query(query, ranked, effective_history)
                 if rewritten and rewritten != query:
                     state.rewritten_query = rewritten
                     query = rewritten
+                    # Re-run with best-effort evidence so the rewriter has context
+                    evidence = self._evidence_selector.select(
+                        ranked,
+                        score_type=score_type,
+                        query=query,
+                    )
                     continue
 
+            state.chunks = evidence
             break
 
         check_cancel()
-        if not ranked:
+        if not evidence:
             state.finish_reason = "stop"
             state.answer = "根据现有资料无法回答该问题。"
             yield TextDelta(
@@ -276,7 +298,7 @@ class Agent:
         llm_enabled = any(policy.llm_enabled for policy in state.policies)
         num_to_id: dict[str, str] = {}
         if llm_enabled:
-            prompt, num_to_id = _build_prompt(query, ranked)
+            prompt, num_to_id = _build_prompt(query, evidence)
             messages = effective_history + [ChatMessage(role="user", content=prompt)]
             answer_parts: list[str] = []
             async for token in self._chat.astream(messages):
@@ -293,7 +315,7 @@ class Agent:
                 seq += 1
             answer = "".join(answer_parts)
         else:
-            answer = _build_fallback_answer(ranked, num_to_id)
+            answer = _build_fallback_answer(evidence, num_to_id)
 
         state.answer = answer
         citation_pairs = _extract_numeric_citations(answer)
@@ -304,10 +326,10 @@ class Agent:
             if num in num_to_id
         ]
 
-        # If the model did not produce citations, append them explicitly.
+        # If the model did not produce citations, attach them from evidence chunks.
         if not citation_map:
             citation_map = [
-                (item.chunk.content[:120], str(item.chunk.chunk_id)) for item in ranked[:5]
+                (item.chunk.content[:120], str(item.chunk.chunk_id)) for item in evidence[:5]
             ]
 
         # Emit citation data parts for unique referenced chunks.
@@ -317,7 +339,7 @@ class Agent:
                 continue
             emitted.add(citation_id)
             chunk_item = next(
-                (item for item in ranked if str(item.chunk.chunk_id) == citation_id), None
+                (item for item in evidence if str(item.chunk.chunk_id) == citation_id), None
             )
             if chunk_item is None:
                 continue
@@ -347,11 +369,11 @@ class Agent:
             finishReason="stop",
         )
 
-    def _assess_evidence(self, ranked: list[RankedChunk]) -> bool:
-        if not ranked:
+    def _assess_evidence(self, evidence: list[RankedChunk]) -> bool:
+        if not evidence:
             return False
         # Evidence is sufficient if the top chunk has a meaningful score.
-        top_score = ranked[0].rerank_score if ranked[0].rerank_score is not None else ranked[0].rrf_score
+        top_score = evidence[0].rerank_score if evidence[0].rerank_score is not None else evidence[0].rrf_score
         return top_score is not None and top_score >= self._evidence_threshold
 
     async def _rewrite_query(
@@ -405,11 +427,11 @@ def _summary_to_event(summary: RetrievalSummary) -> dict[str, Any]:
     }
 
 
-def _build_prompt(query: str, ranked: list[RankedChunk]) -> tuple[str, dict[str, str]]:
+def _build_prompt(query: str, evidence: list[RankedChunk]) -> tuple[str, dict[str, str]]:
     """Build the LLM prompt with numbered evidence and return (prompt, num→chunk_id map)."""
     num_to_id: dict[str, str] = {}
     lines = [f"Question: {query}", "", "Evidence:"]
-    for index, item in enumerate(ranked[:10], start=1):
+    for index, item in enumerate(evidence, start=1):
         chunk = item.chunk
         num_to_id[str(index)] = str(chunk.chunk_id)
         lines.append(f"[{index}] {chunk.content}")
@@ -427,10 +449,10 @@ def _build_prompt(query: str, ranked: list[RankedChunk]) -> tuple[str, dict[str,
 
 
 def _build_fallback_answer(
-    ranked: list[RankedChunk], num_to_id: dict[str, str]
+    evidence: list[RankedChunk], num_to_id: dict[str, str]
 ) -> str:
     sentences: list[str] = []
-    for index, item in enumerate(ranked[:5], start=1):
+    for index, item in enumerate(evidence, start=1):
         text = item.chunk.content.rstrip("。，,；;").strip()
         if text:
             sentences.append(f"{text}。[{index}]")

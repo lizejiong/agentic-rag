@@ -51,7 +51,7 @@ def create_reranker(
             base_url=base_url,
             model=version,
             timeout_seconds=timeout_seconds,
-            instruction=instruct,
+            instruct=instruct,
         )
     if provider == "siliconflow":
         if not api_key:
@@ -62,7 +62,7 @@ def create_reranker(
             base_url=base_url or "https://api.siliconflow.cn/v1/rerank",
             model=version,
             timeout_seconds=timeout_seconds,
-            instruction=instruct if version.startswith("Qwen/Qwen3-Reranker-") else None,
+            instruct=instruct if version.startswith("Qwen/Qwen3-Reranker-") else None,
         )
     raise ValueError(f"Unsupported reranker provider: {provider}")
 

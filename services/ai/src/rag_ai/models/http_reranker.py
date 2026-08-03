@@ -38,7 +38,7 @@ class HttpReranker(Reranker):
         base_url: str,
         model: str,
         timeout_seconds: float = 15.0,
-        instruction: str | None = None,
+        instruct: str | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         if provider not in self._SPEC:
@@ -48,7 +48,7 @@ class HttpReranker(Reranker):
         self._base_url = base_url
         self._model = model
         self._timeout_seconds = timeout_seconds
-        self._instruction = instruction
+        self._instruct = instruct
         self._transport = transport
 
     @property
@@ -74,12 +74,12 @@ class HttpReranker(Reranker):
             "top_n": top_n,
             **spec["extra_payload"],
         }
-        instruction = self._instruction
-        if instruction is not None:
-            payload[str(spec["instruction_field"])] = instruction
+        instruct = self._instruct
+        if instruct:
+            payload[spec["instruction_field"]] = instruct
         elif self._provider == "bailian":
             # Bailian requires the instruct field in every request.
-            payload[str(spec["instruction_field"])] = self._DEFAULT_INSTRUCTION
+            payload[spec["instruction_field"]] = self._DEFAULT_INSTRUCTION
         return payload
 
     # ------------------------------------------------------------------
