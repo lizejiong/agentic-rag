@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { z } from 'zod';
 
 import type { AuthenticatedUser } from '../auth/auth.types';
@@ -6,7 +11,11 @@ import type { Prisma } from '../generated/prisma/client';
 import { SpacePolicy } from '../spaces/space-policy';
 import { PrismaService } from '../infrastructure/database/prisma.service';
 
-const evidenceSchema = z.object({ document: z.string().min(1), anchor: z.string(), quote: z.string().min(1) });
+const evidenceSchema = z.object({
+  document: z.string().min(1),
+  anchor: z.string(),
+  quote: z.string().min(1),
+});
 const caseSchema = z.object({
   id: z.string().min(1).optional(),
   question: z.string().min(1),
@@ -25,17 +34,27 @@ export class EvaluationService {
     private readonly spacePolicy: SpacePolicy,
   ) {}
 
-  async createDataset(user: AuthenticatedUser, input: { name: string; description?: string | undefined; spaceId: string }) {
+  async createDataset(
+    user: AuthenticatedUser,
+    input: { name: string; description?: string | undefined; spaceId: string },
+  ) {
     await this.spacePolicy.require(user, input.spaceId, 'MANAGE');
     return this.prisma.evaluationDataset.create({
-      data: { name: input.name.trim(), description: input.description?.trim() || null, spaceId: input.spaceId, createdById: user.id },
+      data: {
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        spaceId: input.spaceId,
+        createdById: user.id,
+      },
       include: { _count: { select: { cases: true, runs: true } } },
     });
   }
 
   async listDatasets(user: AuthenticatedUser) {
     const visible = await this.spacePolicy.listVisible(user);
-    const manageableSpaceIds = new Set(visible.filter((space) => space.effectivePermission === 'MANAGE').map((space) => space.id));
+    const manageableSpaceIds = new Set(
+      visible.filter((space) => space.effectivePermission === 'MANAGE').map((space) => space.id),
+    );
     const datasets = await this.prisma.evaluationDataset.findMany({
       orderBy: { updatedAt: 'desc' },
       include: { _count: { select: { cases: true, runs: true } } },
@@ -76,7 +95,10 @@ export class EvaluationService {
 
   async previewCasesFromJsonl(user: AuthenticatedUser, datasetId: string, content: string) {
     const dataset = await this.getDataset(user, datasetId);
-    return { incomingCaseCount: this.parseJsonl(content).length, existingCaseCount: dataset.cases.length };
+    return {
+      incomingCaseCount: this.parseJsonl(content).length,
+      existingCaseCount: dataset.cases.length,
+    };
   }
 
   async deleteDataset(user: AuthenticatedUser, datasetId: string) {
@@ -93,7 +115,12 @@ export class EvaluationService {
     if (!dataset.cases.length) throw new BadRequestException('EVALUATION_CASES_REQUIRED');
     await this.requireNoActiveRun(dataset.id);
     return this.prisma.evaluationRun.create({
-      data: { datasetId: dataset.id, spaceId: dataset.spaceId, createdById: user.id, mode: mode === 'full' ? 'FULL' : 'RETRIEVAL' },
+      data: {
+        datasetId: dataset.id,
+        spaceId: dataset.spaceId,
+        createdById: user.id,
+        mode: mode === 'full' ? 'FULL' : 'RETRIEVAL',
+      },
     });
   }
 
@@ -117,7 +144,7 @@ export class EvaluationService {
             stages: result.stages as Prisma.InputJsonValue,
             trace: result.trace as Prisma.InputJsonValue,
             referenceAnswer: sourceCase?.referenceAnswer ?? null,
-            expectedEvidence: (sourceCase?.expectedEvidence ?? []) as Prisma.InputJsonValue,
+            expectedEvidence: sourceCase?.expectedEvidence ?? [],
             expectedAnswerPoints: sourceCase?.expectedAnswerPoints ?? [],
             answer: result.answer,
             citations: result.citations as Prisma.InputJsonValue,
@@ -131,7 +158,11 @@ export class EvaluationService {
       });
       return transaction.evaluationRun.update({
         where: { id: runId },
-        data: { status: 'COMPLETED', summary: output.summary as Prisma.InputJsonValue, completedAt: new Date() },
+        data: {
+          status: 'COMPLETED',
+          summary: output.summary as Prisma.InputJsonValue,
+          completedAt: new Date(),
+        },
         include: { results: { orderBy: { position: 'asc' } } },
       });
     });
@@ -139,18 +170,24 @@ export class EvaluationService {
 
   async failRun(runId: string, error: string) {
     return this.prisma.evaluationRun.update({
-      where: { id: runId }, data: { status: 'FAILED', error, completedAt: new Date() },
+      where: { id: runId },
+      data: { status: 'FAILED', error, completedAt: new Date() },
     });
   }
 
   async listRuns(user: AuthenticatedUser, datasetId: string) {
     const dataset = await this.getDataset(user, datasetId);
-    return this.prisma.evaluationRun.findMany({ where: { datasetId: dataset.id }, orderBy: { createdAt: 'desc' }, take: 20 });
+    return this.prisma.evaluationRun.findMany({
+      where: { datasetId: dataset.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
   }
 
   async getRun(user: AuthenticatedUser, runId: string) {
     const run = await this.prisma.evaluationRun.findUnique({
-      where: { id: runId }, include: { results: { orderBy: { position: 'asc' } } },
+      where: { id: runId },
+      include: { results: { orderBy: { position: 'asc' } } },
     });
     if (!run) throw new NotFoundException('EVALUATION_RUN_NOT_FOUND');
     await this.spacePolicy.require(user, run.spaceId, 'MANAGE');
@@ -164,13 +201,18 @@ export class EvaluationService {
       try {
         return caseSchema.parse(JSON.parse(line) as unknown);
       } catch (error) {
-        throw new BadRequestException(`EVALUATION_CASE_INVALID_LINE_${index + 1}: ${error instanceof Error ? error.message : 'invalid JSONL'}`);
+        throw new BadRequestException(
+          `EVALUATION_CASE_INVALID_LINE_${index + 1}: ${error instanceof Error ? error.message : 'invalid JSONL'}`,
+        );
       }
     });
   }
 
   private async requireNoActiveRun(datasetId: string) {
-    const activeRun = await this.prisma.evaluationRun.findFirst({ where: { datasetId, status: 'RUNNING' }, select: { id: true } });
+    const activeRun = await this.prisma.evaluationRun.findFirst({
+      where: { datasetId, status: 'RUNNING' },
+      select: { id: true },
+    });
     if (activeRun) throw new ConflictException('EVALUATION_RUN_IN_PROGRESS');
   }
 }

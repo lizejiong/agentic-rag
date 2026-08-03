@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpException, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpException,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { z } from 'zod';
 
 import { AccessTokenGuard } from '../auth/access-token.guard';
@@ -48,7 +58,11 @@ export class EvaluationController {
     @Param('datasetId') datasetId: string,
     @Body() input: unknown,
   ) {
-    return this.evaluations.replaceCasesFromJsonl(user, datasetIdSchema.parse(datasetId), importCasesSchema.parse(input).content);
+    return this.evaluations.replaceCasesFromJsonl(
+      user,
+      datasetIdSchema.parse(datasetId),
+      importCasesSchema.parse(input).content,
+    );
   }
 
   @Post('datasets/:datasetId/cases:preview')
@@ -57,12 +71,19 @@ export class EvaluationController {
     @Param('datasetId') datasetId: string,
     @Body() input: unknown,
   ) {
-    return this.evaluations.previewCasesFromJsonl(user, datasetIdSchema.parse(datasetId), importCasesSchema.parse(input).content);
+    return this.evaluations.previewCasesFromJsonl(
+      user,
+      datasetIdSchema.parse(datasetId),
+      importCasesSchema.parse(input).content,
+    );
   }
 
   @Delete('datasets/:datasetId')
   @HttpCode(204)
-  async deleteDataset(@CurrentUser() user: AuthenticatedUser, @Param('datasetId') datasetId: string) {
+  async deleteDataset(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('datasetId') datasetId: string,
+  ) {
     await this.evaluations.deleteDataset(user, datasetIdSchema.parse(datasetId));
   }
 
@@ -100,7 +121,11 @@ export class EvaluationController {
     return run;
   }
 
-  private async executeRun(runId: string, mode: 'retrieval' | 'full', payload: Record<string, unknown>) {
+  private async executeRun(
+    runId: string,
+    mode: 'retrieval' | 'full',
+    payload: Record<string, unknown>,
+  ) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), mode === 'full' ? 600_000 : 120_000);
     try {
@@ -111,10 +136,15 @@ export class EvaluationController {
         signal: controller.signal,
       });
       if (!response.ok) throw new HttpException('EVALUATION_SERVICE_UNAVAILABLE', 502);
-      await this.evaluations.completeRun(runId, await response.json() as EvaluationOutput);
+      await this.evaluations.completeRun(runId, (await response.json()) as EvaluationOutput);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Evaluation run failed';
-      await this.evaluations.failRun(runId, error instanceof DOMException && error.name === 'AbortError' ? 'EVALUATION_TIMEOUT' : message);
+      await this.evaluations.failRun(
+        runId,
+        error instanceof DOMException && error.name === 'AbortError'
+          ? 'EVALUATION_TIMEOUT'
+          : message,
+      );
     } finally {
       clearTimeout(timeout);
     }
