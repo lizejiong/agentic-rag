@@ -48,6 +48,18 @@ class EchoChatModel(ChatModel):
         return ChatResponse(content=messages[-1].content)
 
 
+class PlainChatModel(EchoChatModel):
+    async def achat(
+        self,
+        messages: list[ChatMessage],
+        *,
+        temperature: float = 0.3,
+        max_tokens: int = 2048,
+        stop: list[str] | None = None,
+    ) -> ChatResponse:
+        return ChatResponse(content="Plain answer without numeric citations.")
+
+
 def _ranked(text: str, score: float = 0.5) -> RankedChunk:
     return RankedChunk(
         chunk=RetrievedChunk(
@@ -88,6 +100,28 @@ async def test_agent_returns_answer_with_citations() -> None:
     assert any(event.type == "citation" for event in events)
     text = "".join(event.text for event in events if event.type == "text.delta")
     assert "42" in text or "answer" in text
+
+
+@pytest.mark.asyncio
+async def test_agent_does_not_repeat_answer_when_citations_are_added() -> None:
+    agent = Agent(retrieval=FakeRetrieval([_ranked("Supporting evidence.")]), chat=PlainChatModel())
+    events = []
+    async for event in agent.run(
+        request_id=uuid4(),
+        trace_id="trace",
+        actor_id="actor",
+        query="question",
+        selected_space_ids=[],
+        acl=AclSnapshot(user_id=uuid4(), admin=False, group_ids=[], spaces={}),
+        policies=[SpacePolicy(uuid4(), True, True, True)],
+        history=[],
+        cancelled=asyncio.Event(),
+    ):
+        events.append(event)
+
+    text = "".join(event.text for event in events if event.type == "text.delta")
+    assert text == "Plain answer without numeric citations."
+    assert any(event.type == "citation" for event in events)
 
 
 @pytest.mark.asyncio

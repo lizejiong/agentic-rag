@@ -113,6 +113,21 @@ enum OutboxStatus {
   @@schema("app")
 }
 
+enum EvaluationRunMode {
+  RETRIEVAL
+  FULL
+
+  @@schema("app")
+}
+
+enum EvaluationRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+
+  @@schema("app")
+}
+
 model User {
   id               String            @id @default(uuid()) @db.Uuid
   username         String            @unique @db.VarChar(80)
@@ -132,6 +147,8 @@ model User {
   createdDocuments Document[]        @relation("DocumentCreator")
   createdVersions  DocumentVersion[] @relation("DocumentVersionCreator")
   createdImports   ImportTask[]      @relation("ImportTaskCreator")
+  evaluationDatasets EvaluationDataset[] @relation("EvaluationDatasetCreator")
+  evaluationRuns     EvaluationRun[]     @relation("EvaluationRunCreator")
   refreshSessions  RefreshSession[]
 
   @@index([departmentId])
@@ -197,10 +214,103 @@ model KnowledgeSpace {
   createdBy              User         @relation("SpaceCreator", fields: [createdById], references: [id])
   grants                 SpaceGrant[]
   documents              Document[]
+  evaluationDatasets     EvaluationDataset[]
+  evaluationRuns         EvaluationRun[]
 
   @@index([status])
   @@index([createdById])
   @@map("knowledge_spaces")
+  @@schema("app")
+}
+
+model EvaluationDataset {
+  id          String          @id @default(uuid()) @db.Uuid
+  name        String          @db.VarChar(160)
+  description String?
+  spaceId     String          @map("space_id") @db.Uuid
+  createdById String          @map("created_by_id") @db.Uuid
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  space       KnowledgeSpace  @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+  createdBy   User            @relation("EvaluationDatasetCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  cases       EvaluationCase[]
+  runs        EvaluationRun[]
+
+  @@index([spaceId])
+  @@index([createdById])
+  @@map("evaluation_datasets")
+  @@schema("app")
+}
+
+model EvaluationCase {
+  id                   String            @id @default(uuid()) @db.Uuid
+  datasetId            String            @map("dataset_id") @db.Uuid
+  position             Int
+  question             String
+  referenceAnswer      String            @map("reference_answer")
+  expectedEvidence     Json              @map("expected_evidence")
+  expectedAnswerPoints String[]          @default([]) @map("expected_answer_points")
+  expectNoAnswer       Boolean           @default(false) @map("expect_no_answer")
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  dataset              EvaluationDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  runResults           EvaluationRunResult[]
+
+  @@unique([datasetId, position])
+  @@index([datasetId])
+  @@map("evaluation_cases")
+  @@schema("app")
+}
+
+model EvaluationRun {
+  id          String              @id @default(uuid()) @db.Uuid
+  datasetId   String              @map("dataset_id") @db.Uuid
+  spaceId     String              @map("space_id") @db.Uuid
+  createdById String              @map("created_by_id") @db.Uuid
+  mode        EvaluationRunMode
+  status      EvaluationRunStatus @default(RUNNING)
+  summary     Json?
+  error       String?
+  startedAt   DateTime            @default(now()) @map("started_at") @db.Timestamptz(3)
+  completedAt DateTime?           @map("completed_at") @db.Timestamptz(3)
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  dataset     EvaluationDataset   @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  space       KnowledgeSpace      @relation(fields: [spaceId], references: [id], onDelete: Restrict)
+  createdBy   User                @relation("EvaluationRunCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  results     EvaluationRunResult[]
+
+  @@index([datasetId, createdAt])
+  @@index([spaceId])
+  @@map("evaluation_runs")
+  @@schema("app")
+}
+
+model EvaluationRunResult {
+  id                        String        @id @default(uuid()) @db.Uuid
+  runId                     String        @map("run_id") @db.Uuid
+  caseId                    String?       @map("case_id") @db.Uuid
+  position                  Int
+  question                  String
+  effectiveQuery            String        @map("effective_query")
+  expectNoAnswer            Boolean       @default(false) @map("expect_no_answer")
+  stages                    Json
+  trace                     Json
+  referenceAnswer           String?       @map("reference_answer")
+  expectedEvidence          Json          @default("[]") @map("expected_evidence")
+  expectedAnswerPoints      String[]      @default([]) @map("expected_answer_points")
+  answer                    String?
+  citations                 Json?
+  answerPointCoverage       Float?        @map("answer_point_coverage")
+  citationEvidencePrecision Float?        @map("citation_evidence_precision")
+  refusalCorrect            Boolean?      @map("refusal_correct")
+  error                     String?
+  elapsedMs                 Float         @map("elapsed_ms")
+  run                       EvaluationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  evaluationCase            EvaluationCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@unique([runId, position])
+  @@index([caseId])
+  @@map("evaluation_run_results")
   @@schema("app")
 }
 

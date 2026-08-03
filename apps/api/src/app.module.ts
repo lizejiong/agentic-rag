@@ -7,6 +7,7 @@ import { AuthorizationModule } from './authorization/authorization.module';
 import { ChatModule } from './chat/chat.module';
 import { CitationsModule } from './citations/citations.module';
 import { DocumentsModule } from './documents/documents.module';
+import { EvaluationModule } from './evaluation/evaluation.module';
 import { HealthController } from './health/health.controller';
 import { ConfigurationModule } from './infrastructure/config/configuration.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
@@ -30,6 +31,7 @@ import { UsersModule } from './users/users.module';
     OrganizationModule,
     SpacesModule,
     DocumentsModule,
+    EvaluationModule,
     SearchModule,
     CitationsModule,
     ChatModule,

@@ -20,7 +20,7 @@ from rag_ai.contracts.agent_events import (
     TextDelta,
 )
 from rag_ai.models.base import ChatMessage, ChatModel
-from rag_ai.retrieval.models import AclSnapshot, CitationLocation as DomainCitationLocation, RankedChunk, RetrievalSummary, SpacePolicy
+from rag_ai.retrieval.models import AclSnapshot, CitationLocation as DomainCitationLocation, RankedChunk, RetrievalSummary, RetrievalTrace, SpacePolicy
 from rag_ai.retrieval.service import RetrievalService
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,7 @@ class AgentState:
     rewrite_count: int = 0
     chunks: list[RankedChunk] = field(default_factory=list)
     summary: RetrievalSummary | None = None
+    retrieval_trace: RetrievalTrace | None = None
     answer: str = ""
     citations: list[Citation] = field(default_factory=list)
     finish_reason: str = "stop"
@@ -54,6 +55,9 @@ class AgentResult:
     answer: str
     citations: list[Citation]
     finish_reason: str
+    summary: RetrievalSummary | None
+    trace: RetrievalTrace | None
+    effective_query: str
 
 
 class Agent:
@@ -130,6 +134,37 @@ class Agent:
             )
             return
 
+    async def run_evaluation(
+        self,
+        *,
+        request_id: UUID,
+        trace_id: str,
+        actor_id: str,
+        query: str,
+        selected_space_ids: list[UUID],
+        acl: AclSnapshot,
+        policies: list[SpacePolicy],
+    ) -> AgentResult:
+        """Execute the same Agent path as chat without serialising stream events."""
+        state = AgentState(
+            request_id=request_id,
+            trace_id=trace_id,
+            actor_id=actor_id,
+            query=query,
+            selected_space_ids=selected_space_ids,
+            acl=acl,
+            policies=policies,
+        )
+        async for _event in self._execute(state, asyncio.Event()):
+            pass
+        return AgentResult(
+            answer=state.answer,
+            citations=state.citations,
+            finish_reason=state.finish_reason,
+            summary=state.summary,
+            trace=state.retrieval_trace,
+            effective_query=state.rewritten_query or state.query,
+        )
     async def _execute(
         self, state: AgentState, cancelled: asyncio.Event
     ) -> AsyncIterator[AgentEvent]:
@@ -170,6 +205,7 @@ class Agent:
                 query, state.selected_space_ids, state.acl, state.policies
             )
             state.summary = summary
+            state.retrieval_trace = summary.trace
             state.chunks = ranked
 
             yield RetrievalSummaryEvent(
@@ -273,20 +309,6 @@ class Agent:
             citation_map = [
                 (item.chunk.content[:120], str(item.chunk.chunk_id)) for item in ranked[:5]
             ]
-            answer = _attach_citations(answer, citation_map)
-            state.answer = answer
-            # Re-emit the augmented answer that now includes citations.
-            for char in answer:
-                check_cancel()
-                yield TextDelta(
-                    requestId=state.request_id,
-                    traceId=state.trace_id,
-                    seq=seq,
-                    occurredAt=datetime.now(timezone.utc),
-                    type="text.delta",
-                    text=char,
-                )
-                seq += 1
 
         # Emit citation data parts for unique referenced chunks.
         emitted: set[str] = set()
@@ -299,7 +321,7 @@ class Agent:
             )
             if chunk_item is None:
                 continue
-            yield Citation(
+            citation = Citation(
                 requestId=state.request_id,
                 traceId=state.trace_id,
                 seq=seq,
@@ -312,6 +334,8 @@ class Agent:
                 snippet=chunk_item.chunk.content[:300],
                 location=_to_event_location(chunk_item.chunk.location),
             )
+            state.citations.append(citation)
+            yield citation
             seq += 1
 
         yield RunCompleted(
