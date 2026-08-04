@@ -341,6 +341,9 @@ async def _evaluate_case(
         ]
         stages["evidence"] = _stage_metrics(evidence_trace, case.expectedEvidence)
         trace_dict["evidence"] = [_trace_item(item) for item in evidence_trace]
+    else:
+        stages["evidence"] = _empty_stage_metrics()
+        trace_dict["evidence"] = []
     coverage = None
     citation_precision = None
     refusal_correct = None
@@ -412,7 +415,7 @@ async def evaluate_retrieval(request: EvaluationRequest) -> EvaluationResponse:
                 "hitAt10": average([float(result.stages[stage].hitAt10) for result in answerable]),
                 "mrr": average([result.stages[stage].mrr for result in answerable]),
             }
-            for stage in ("vector", "lexical", "rrf", "rerank")
+            for stage in ("vector", "lexical", "rrf", "rerank", "evidence")
         },
         "answerPointCoverage": average([item.answerPointCoverage for item in completed if item.answerPointCoverage is not None]),
         "citationEvidencePrecision": average([item.citationEvidencePrecision for item in completed if item.citationEvidencePrecision is not None]),
