@@ -30,8 +30,9 @@ export class PythonAiClient implements AiEventSource {
             JSON.stringify(value).slice(0, 500),
           );
           yield {
-            requestId: (value as Record<string, unknown>).requestId as string ?? request.requestId,
-            traceId: (value as Record<string, unknown>).traceId as string ?? request.traceId,
+            requestId:
+              ((value as Record<string, unknown>).requestId as string) ?? request.requestId,
+            traceId: ((value as Record<string, unknown>).traceId as string) ?? request.traceId,
             seq: expectedSeq,
             occurredAt: new Date().toISOString(),
             type: 'run.failed' as const,

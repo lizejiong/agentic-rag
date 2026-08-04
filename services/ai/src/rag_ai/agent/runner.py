@@ -59,6 +59,7 @@ class AgentResult:
     summary: RetrievalSummary | None
     trace: RetrievalTrace | None
     effective_query: str
+    evidence_chunks: list[RankedChunk]
 
 
 class Agent:
@@ -167,6 +168,7 @@ class Agent:
             summary=state.summary,
             trace=state.retrieval_trace,
             effective_query=state.rewritten_query or state.query,
+            evidence_chunks=list(state.chunks),
         )
     async def _execute(
         self, state: AgentState, cancelled: asyncio.Event
