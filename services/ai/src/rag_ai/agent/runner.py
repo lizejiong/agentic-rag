@@ -5,7 +5,7 @@ import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 from uuid import UUID
 
 from rag_ai.contracts.agent_events import (
@@ -235,7 +235,7 @@ class Agent:
             seq += 1
 
             # ── Evidence selection ──
-            score_type = (
+            score_type: Literal["reranker", "rrf"] = (
                 "reranker" if summary.reranker_enabled and not summary.reranker_failed
                 else "rrf"
             )

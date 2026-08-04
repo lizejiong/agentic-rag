@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import TypedDict, cast
 
 import httpx
 
 from rag_ai.models.base import RankedCandidate, Reranker
+
+
+class _ProviderSpec(TypedDict):
+    instruction_field: str
+    extra_payload: dict[str, object]
 
 
 class HttpReranker(Reranker):
@@ -15,7 +20,7 @@ class HttpReranker(Reranker):
     OpenAI-compatible rerank endpoint).
     """
 
-    _SPEC: dict[str, dict[str, object]] = {
+    _SPEC: dict[str, _ProviderSpec] = {
         "siliconflow": {
             "instruction_field": "instruction",
             "extra_payload": {"return_documents": False},
