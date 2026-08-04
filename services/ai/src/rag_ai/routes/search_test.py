@@ -258,8 +258,8 @@ def _failed_case_result(
         question=case.question,
         effectiveQuery=case.question,
         expectNoAnswer=case.expectNoAnswer,
-        stages={stage: _empty_stage_metrics() for stage in ("vector", "lexical", "rrf", "rerank")},
-        trace={stage: [] for stage in ("vector", "lexical", "rrf", "rerank")},
+        stages={stage: _empty_stage_metrics() for stage in ("vector", "lexical", "rrf", "rerank", "evidence")},
+        trace={stage: [] for stage in ("vector", "lexical", "rrf", "rerank", "evidence")},
         error=f"{type(error).__name__}: {error}",
         elapsedMs=round(elapsed_ms, 2),
     )
@@ -322,6 +322,25 @@ async def _evaluate_case(
         "rrf": _stage_metrics(trace.rrf, case.expectedEvidence),
         "rerank": _stage_metrics(trace.rerank or trace.rrf, case.expectedEvidence),
     }
+    trace_dict: dict[str, list[SearchTestTraceItem]] = {
+        "vector": [_trace_item(item) for item in trace.vector],
+        "lexical": [_trace_item(item) for item in trace.lexical],
+        "rrf": [_trace_item(item) for item in trace.rrf],
+        "rerank": [_trace_item(item) for item in trace.rerank],
+    }
+
+    # ── Evidence stage: chunks selected by EvidenceSelector ──
+    if request.mode == "full":
+        evidence_trace = [
+            RetrievalTraceItem(
+                chunk=item.chunk,
+                rank=i + 1,
+                score=item.rerank_score if item.rerank_score is not None else (item.rrf_score or 0),
+            )
+            for i, item in enumerate(agent_result.evidence_chunks)
+        ]
+        stages["evidence"] = _stage_metrics(evidence_trace, case.expectedEvidence)
+        trace_dict["evidence"] = [_trace_item(item) for item in evidence_trace]
     coverage = None
     citation_precision = None
     refusal_correct = None
@@ -346,12 +365,7 @@ async def _evaluate_case(
     return EvaluationCaseResult(
         id=case.id, question=case.question, effectiveQuery=effective_query,
         expectNoAnswer=case.expectNoAnswer, stages=stages,
-        trace={
-            "vector": [_trace_item(item) for item in trace.vector],
-            "lexical": [_trace_item(item) for item in trace.lexical],
-            "rrf": [_trace_item(item) for item in trace.rrf],
-            "rerank": [_trace_item(item) for item in trace.rerank],
-        },
+        trace=trace_dict,
         rerankNote=trace.rerank_note, answer=answer, citations=citations,
         answerPointCoverage=coverage, citationEvidencePrecision=citation_precision,
         refusalCorrect=refusal_correct, elapsedMs=0.0,

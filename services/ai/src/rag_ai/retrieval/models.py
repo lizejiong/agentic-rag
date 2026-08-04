@@ -48,6 +48,7 @@ class RetrievalSummary:
     rrf_top_k: int
     rerank_top_k: int
     reranker_enabled: bool
+    reranker_failed: bool = False
     paths: list[RetrievalPathSummary] = field(default_factory=list)
     rrf_candidate_count: int = 0
     final_candidate_count: int = 0

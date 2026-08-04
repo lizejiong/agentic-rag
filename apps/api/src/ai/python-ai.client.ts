@@ -25,8 +25,22 @@ export class PythonAiClient implements AiEventSource {
       for await (const value of parseNdjson(response.body)) {
         const parsed = agentEventSchema.safeParse(value);
         if (!parsed.success) {
-          this.logger.error(`Invalid AI event: ${parsed.error.message}`);
-          throw new Error('Invalid AI event');
+          this.logger.error(
+            `Invalid AI event at seq ${expectedSeq}: ${parsed.error.message}`,
+            JSON.stringify(value).slice(0, 500),
+          );
+          yield {
+            requestId:
+              ((value as Record<string, unknown>).requestId as string) ?? request.requestId,
+            traceId: ((value as Record<string, unknown>).traceId as string) ?? request.traceId,
+            seq: expectedSeq,
+            occurredAt: new Date().toISOString(),
+            type: 'run.failed' as const,
+            code: 'INVALID_AI_EVENT',
+            message: `AI service returned an unrecognised event at seq ${expectedSeq}`,
+            retryable: false,
+          };
+          return;
         }
         const event = parsed.data;
         if (event.seq !== expectedSeq) {

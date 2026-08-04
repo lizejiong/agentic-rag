@@ -87,6 +87,7 @@ class RetrievalService:
         reranker_enabled = any(policy.reranker_enabled for policy in policies)
         final_chunks: list[RankedChunk]
         rerank_note: str | None = None
+        reranker_failed = False
         if reranker_enabled and fused:
             candidates_for_rerank = [
                 (str(item.chunk.chunk_id), item.chunk.content) for item in fused
@@ -99,6 +100,7 @@ class RetrievalService:
                 logger.warning("Reranker failed; returning RRF results", exc_info=True)
                 final_chunks = self._rrf_chunks(fused, options.rerank_top_k)
                 rerank_note = "Reranker 调用失败，已回退为 RRF 排名。"
+                reranker_failed = True
             else:
                 rerank_ids = {item.chunk_id for item in reranked}
                 final_chunks = []
@@ -170,6 +172,7 @@ class RetrievalService:
             rrf_top_k=options.rrf_top_k,
             rerank_top_k=options.rerank_top_k,
             reranker_enabled=reranker_enabled,
+            reranker_failed=reranker_failed,
             paths=[vector_summary, lexical_summary],
             rrf_candidate_count=len(fused),
             final_candidate_count=len(final_chunks),

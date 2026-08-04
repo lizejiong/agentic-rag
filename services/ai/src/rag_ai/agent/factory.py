@@ -7,6 +7,7 @@ from rag_ai.agent.runner import Agent
 from rag_ai.memory.session_memory import RedisSessionMemoryStore
 from rag_ai.models.base import ChatModel, EmbeddingModel, Reranker
 from rag_ai.models.factory import create_chat_model, create_embedding_model, create_reranker
+from rag_ai.retrieval.evidence_selector import EvidenceSelector
 from rag_ai.retrieval.lexical_repository import LexicalRepository
 from rag_ai.retrieval.service import RetrievalOptions, RetrievalService
 from rag_ai.retrieval.vector_repository import VectorRepository
@@ -70,6 +71,26 @@ def build_memory_store(settings: WorkerSettings) -> RedisSessionMemoryStore:
     )
 
 
+def build_evidence_selector(settings: WorkerSettings) -> EvidenceSelector:
+    return EvidenceSelector(
+        model_name=settings.evidence_model_name,
+        fallback_encoding=settings.evidence_fallback_encoding,
+        rerank_min_score=settings.evidence_rerank_min_score,
+        rrf_min_score=settings.evidence_rrf_min_score,
+        rerank_max_relative_drop=settings.evidence_rerank_max_relative_drop,
+        rerank_absolute_drop=settings.evidence_rerank_absolute_drop,
+        rrf_max_relative_drop=settings.evidence_rrf_max_relative_drop,
+        rrf_absolute_drop=settings.evidence_rrf_absolute_drop,
+        cliff_min_chunks=settings.evidence_cliff_min_chunks,
+        max_evidence_tokens=settings.evidence_max_evidence_tokens,
+        max_chunk_tokens=settings.evidence_max_chunk_tokens,
+        max_evidence_chunks=settings.evidence_max_evidence_chunks,
+        output_reservation=settings.evidence_output_reservation,
+        max_chunks_per_doc=settings.evidence_max_chunks_per_doc,
+        jaccard_similarity_threshold=settings.evidence_jaccard_similarity_threshold,
+    )
+
+
 def build_agent(
     settings: WorkerSettings,
     *,
@@ -84,4 +105,5 @@ def build_agent(
             api_key=settings.llm_api_key or settings.openai_api_key,
             base_url=settings.llm_base_url or settings.openai_base_url,
         ),
+        evidence_selector=build_evidence_selector(settings),
     )
