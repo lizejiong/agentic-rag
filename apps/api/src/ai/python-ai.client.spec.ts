@@ -73,13 +73,18 @@ describe('PythonAiClient', () => {
     );
   });
 
-  it('rejects schema-invalid events', async () => {
+  it('yields run.failed on schema-invalid events', async () => {
     jest
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(ndjsonResponse([{ ...event(0), unexpected: true }]));
     const client = new PythonAiClient();
 
-    await expect(collect(client.run(REQUEST, new AbortController().signal))).rejects.toThrow();
+    const events = await collect(client.run(REQUEST, new AbortController().signal));
+    expect(events.length).toBe(1);
+    expect(events[0]).toMatchObject({
+      type: 'run.failed',
+      code: 'INVALID_AI_EVENT',
+    });
   });
 
   it('rejects missing, duplicate, or out-of-order sequence numbers', async () => {
