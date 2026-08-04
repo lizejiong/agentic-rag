@@ -30,6 +30,7 @@ const retrievalSummary = z.object({
   rrfTopK: z.int().nonnegative(),
   rerankTopK: z.int().nonnegative(),
   rerankerEnabled: z.boolean(),
+  rerankerFailed: z.boolean().optional(),
   paths: z.array(retrievalPathSummary),
   rrfCandidateCount: z.int().nonnegative(),
   finalCandidateCount: z.int().nonnegative(),
