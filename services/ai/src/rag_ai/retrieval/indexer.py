@@ -82,79 +82,54 @@ class ChunkIndexer:
             )
             rows = result.mappings().all()
 
-            space_result = await connection.execute(
-                text(
-                    """
-                    SELECT embedding_enabled
-                    FROM app.knowledge_spaces
-                    WHERE id = :space_id
-                    """
-                ),
-                {"space_id": space_id},
-            )
-            space_row = space_result.mappings().one_or_none()
-
-        embedding_enabled = space_row["embedding_enabled"] if space_row else False
-
         if not rows:
             return IndexResult(embedded_count=0, lexical_indexed_count=0)
 
+        # Always generate embeddings regardless of space policy — the policy
+        # only controls whether the vector path is *used* at retrieval time.
         embedded_count = 0
-        if embedding_enabled:
-            embed_result = await self._embedding_model.embed(
-                [row["content"] for row in rows]
+        embed_result = await self._embedding_model.embed(
+            [row["content"] for row in rows]
+        )
+        embeddings = embed_result.embeddings
+        async with self._engine.begin() as connection:
+            await connection.execute(
+                text(
+                    """
+                    INSERT INTO rag.chunk_embeddings (
+                        id, chunk_id, embedding_model, embedding_version, dimensions, embedding
+                    ) VALUES (
+                        gen_random_uuid(), :chunk_id, :embedding_model,
+                        :embedding_version, :dimensions, :embedding
+                    )
+                    ON CONFLICT (chunk_id, embedding_model, embedding_version) DO UPDATE
+                    SET dimensions = EXCLUDED.dimensions,
+                        embedding = EXCLUDED.embedding,
+                        created_at = NOW()
+                    """
+                ),
+                [
+                    {
+                        "chunk_id": row["id"],
+                        "embedding_model": self._embedding_model.model_name,
+                        "embedding_version": self._embedding_model.version,
+                        "dimensions": len(vector),
+                        "embedding": _vector_literal(vector),
+                    }
+                    for row, vector in zip(rows, embeddings, strict=True)
+                ],
             )
-            embeddings = embed_result.embeddings
-            async with self._engine.begin() as connection:
-                await connection.execute(
-                    text(
-                        """
-                        INSERT INTO rag.chunk_embeddings (
-                            id, chunk_id, embedding_model, embedding_version, dimensions, embedding
-                        ) VALUES (
-                            gen_random_uuid(), :chunk_id, :embedding_model,
-                            :embedding_version, :dimensions, :embedding
-                        )
-                        ON CONFLICT (chunk_id, embedding_model, embedding_version) DO UPDATE
-                        SET dimensions = EXCLUDED.dimensions,
-                            embedding = EXCLUDED.embedding,
-                            created_at = NOW()
-                        """
-                    ),
-                    [
-                        {
-                            "chunk_id": row["id"],
-                            "embedding_model": self._embedding_model.model_name,
-                            "embedding_version": self._embedding_model.version,
-                            "dimensions": len(vector),
-                            "embedding": _vector_literal(vector),
-                        }
-                        for row, vector in zip(rows, embeddings, strict=True)
-                    ],
-                )
-                await connection.execute(
-                    text(
-                        """
-                        UPDATE rag.chunks
-                        SET indexed_at = NOW(), is_searchable = true
-                        WHERE version_id = :version_id
-                        """
-                    ),
-                    {"version_id": version_id},
-                )
-            embedded_count = len(rows)
-        else:
-            async with self._engine.begin() as connection:
-                await connection.execute(
-                    text(
-                        """
-                        UPDATE rag.chunks
-                        SET indexed_at = NOW(), is_searchable = true
-                        WHERE version_id = :version_id
-                        """
-                    ),
-                    {"version_id": version_id},
-                )
+            await connection.execute(
+                text(
+                    """
+                    UPDATE rag.chunks
+                    SET indexed_at = NOW(), is_searchable = true
+                    WHERE version_id = :version_id
+                    """
+                ),
+                {"version_id": version_id},
+            )
+        embedded_count = len(rows)
 
         # Always index lexically; ES is the required index.
         await self._lexical_repo.ensure_index()
