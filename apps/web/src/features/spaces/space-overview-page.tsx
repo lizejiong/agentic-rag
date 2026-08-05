@@ -1,11 +1,13 @@
-import { FileCheck2, FileText, LoaderCircle } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FileCheck2, FileText, LoaderCircle, Settings2 } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router';
 
 import { Card } from '@/components/ui/card';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useDocumentsQuery } from '@/features/documents/use-documents-query';
 
-import { useSpacesQuery } from './use-spaces-query';
+import { updateSpace } from './spaces-api';
+import { useSpacesQuery, visibleSpacesQueryKey } from './use-spaces-query';
 
 export function SpaceOverviewPage() {
   const { spaceId = '' } = useParams();
@@ -18,6 +20,15 @@ export function SpaceOverviewPage() {
   const processingCount = documents.filter(
     (document) => document.latestVersion?.processingStatus !== 'READY',
   ).length;
+
+  const queryClient = useQueryClient();
+  const toggleMutation = useMutation({
+    mutationFn: (input: { embeddingEnabled?: boolean; rerankerEnabled?: boolean; llmEnabled?: boolean }) =>
+      updateSpace(auth.authorizedFetch, spaceId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: visibleSpacesQueryKey });
+    },
+  });
 
   if (!spaceId) return <Navigate replace to="/spaces" />;
 
@@ -49,7 +60,68 @@ export function SpaceOverviewPage() {
         <StatCard icon={FileCheck2} label="已就绪文档" value={readyCount} loading={documentsQuery.isPending} />
         <StatCard icon={LoaderCircle} label="处理中任务" value={processingCount} loading={documentsQuery.isPending} />
       </section>
+      {space?.effectivePermission === 'MANAGE' ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <Settings2 size={18} className="text-slate-500" />
+            <h2 className="font-medium text-slate-900">功能配置</h2>
+          </div>
+          <div className="grid grid-cols-3 gap-6">
+            <ToggleRow
+              label="向量检索 (Embedding)"
+              description="启用后对新文档自动生成向量索引，提升语义召回能力"
+              enabled={space?.embeddingEnabled ?? false}
+              loading={toggleMutation.isPending}
+              onChange={(value) => toggleMutation.mutate({ embeddingEnabled: value })}
+            />
+            <ToggleRow
+              label="重排序 (Reranker)"
+              description="检索后调用模型精排，提升最相关 Chunk 的排名"
+              enabled={space?.rerankerEnabled ?? false}
+              loading={toggleMutation.isPending}
+              onChange={(value) => toggleMutation.mutate({ rerankerEnabled: value })}
+            />
+            <ToggleRow
+              label="大模型回答 (LLM)"
+              description="启用后调用大模型生成自然语言回答，关闭则仅返回检索片段"
+              enabled={space?.llmEnabled ?? false}
+              loading={toggleMutation.isPending}
+              onChange={(value) => toggleMutation.mutate({ llmEnabled: value })}
+            />
+          </div>
+        </section>
+      ) : null}
     </div>
+  );
+}
+
+function ToggleRow({
+  label,
+  description,
+  enabled,
+  loading,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  enabled: boolean;
+  loading: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 transition hover:bg-slate-100">
+      <input
+        type="checkbox"
+        className="mt-0.5 h-4 w-4 shrink-0 rounded accent-blue-600"
+        checked={enabled}
+        disabled={loading}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <div>
+        <p className="text-sm font-medium text-slate-800">{label}</p>
+        <p className="mt-0.5 text-xs leading-4 text-slate-500">{description}</p>
+      </div>
+    </label>
   );
 }
 

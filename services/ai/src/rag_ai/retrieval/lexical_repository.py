@@ -28,7 +28,12 @@ class LexicalRepository:
                             "default": {
                                 "type": "custom",
                                 "tokenizer": "standard",
-                                "filter": ["lowercase", "asciifolding"],
+                                "filter": [
+                                    "lowercase",
+                                    "asciifolding",
+                                    "cjk_width",
+                                    "cjk_bigram",
+                                ],
                             }
                         }
                     },
