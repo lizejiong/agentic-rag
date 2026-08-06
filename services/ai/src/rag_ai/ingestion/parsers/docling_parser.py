@@ -248,7 +248,9 @@ class DoclingParser:
         This is a fallback for environments where the native docling PDF
         backend (docling_parse / PDFium C++) is unstable (e.g. Windows).
         """
-        import pypdfium2 as pdfium
+        import pypdfium2 as pdfium  # type: ignore[import-untyped]
+
+        from PIL import Image
 
         pdf = pdfium.PdfDocument(str(path))
         page_count = len(pdf)
@@ -259,21 +261,20 @@ class DoclingParser:
                 retryable=False,
             )
 
-        temp_files: list[Path] = []
-        try:
-            for i in range(page_count):
-                bitmap = pdf[i].render(scale=2)
-                pil_image = bitmap.to_pil()
-                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-                pil_image.save(tmp.name, format="PNG")
-                temp_files.append(Path(tmp.name))
+        # Render all pages and stitch into a single tall image so that
+        # docling's convert() (which only accepts a single input) can
+        # process the entire document in one call.
+        page_images: list[Image.Image] = []
+        for i in range(page_count):
+            bitmap = pdf[i].render(scale=2)
+            page_images.append(bitmap.to_pil())
 
-            # Feed rendered images to docling — this bypasses the C++ PDF
-            # backend and goes through the image→OCR→layout pipeline.
-            result = self._converter.convert(
-                [str(p) for p in temp_files],
-                raises_on_error=True,
-            )
+        combined = _stitch_vertically(page_images)
+        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tmp_path = Path(tmp.name)
+        try:
+            combined.save(str(tmp_path), format="PNG")
+            result = self._converter.convert(tmp_path, raises_on_error=True)
             document = result.document
             logger.info(
                 "pypdfium2 fallback succeeded for %s (%d pages, %d elements)",
@@ -282,11 +283,10 @@ class DoclingParser:
                 len(list(document.iterate_items())),
             )
         finally:
-            for tmp in temp_files:
-                try:
-                    tmp.unlink(missing_ok=True)
-                except OSError:
-                    pass
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
         # Reuse the existing post-processing logic.
         groups: dict[str, tuple[str | None, str | None]] = {}
@@ -328,3 +328,19 @@ class DoclingParser:
                 "fallback": "pypdfium2-rasterisation",
             },
         )
+
+
+def _stitch_vertically(images: list[Any]) -> Any:
+    """Concatenate PIL images top-to-bottom into a single image."""
+    if not images:
+        raise ValueError("At least one image required")
+    if len(images) == 1:
+        return images[0]
+    total_height = sum(img.height for img in images)
+    max_width = max(img.width for img in images)
+    canvas = images[0].__class__("RGB", (max_width, total_height), (255, 255, 255))
+    y_offset = 0
+    for img in images:
+        canvas.paste(img, (0, y_offset))
+        y_offset += img.height
+    return canvas
