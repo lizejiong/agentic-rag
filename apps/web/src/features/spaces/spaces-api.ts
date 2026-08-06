@@ -1,7 +1,7 @@
 import type { Fetcher } from '../../shared/api/request-json';
 import { z } from 'zod';
 import { requestJson } from '../../shared/api/request-json';
-import { visibleSpacesSchema } from './space-contract';
+import { visibleSpaceSchema, visibleSpacesSchema } from './space-contract';
 
 export function listVisibleSpaces(fetcher: Fetcher, signal?: AbortSignal) {
   return requestJson({
