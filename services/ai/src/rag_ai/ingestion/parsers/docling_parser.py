@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import tempfile
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -23,6 +25,8 @@ from rag_ai.ingestion.normalization.models import (
     NormalizedElement,
     SourceLocation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DoclingParser:
@@ -88,6 +92,26 @@ class DoclingParser:
             )
             document = result.document
         except Exception as error:
+            # On Windows the docling PDF backend (docling_parse C++ pipeline)
+            # can fail with std::bad_alloc during layout preprocessing.
+            # Fall back to rasterising pages with pypdfium2 and feeding the
+            # resulting images through docling's image pipeline.
+            if extension == "pdf" and self._looks_like_pdf_backend_failure(error):
+                logger.warning(
+                    "Docling PDF pipeline failed, falling back to pypdfium2 "
+                    "rasterisation: %s",
+                    error,
+                )
+                try:
+                    return self._parse_pdf_via_images(
+                        path, original_file_name, detected_mime_type
+                    )
+                except Exception as fallback_error:
+                    raise IngestionFailure(
+                        "DOCUMENT_PARSE_FAILED",
+                        "Docling PDF pipeline failed and pypdfium2 fallback also failed.",
+                        retryable=False,
+                    ) from fallback_error
             raise IngestionFailure(
                 "DOCUMENT_PARSE_FAILED",
                 "Docling could not parse the document safely.",
@@ -201,3 +225,106 @@ class DoclingParser:
             value, remainder = divmod(value - 1, 26)
             result = chr(65 + remainder) + result
         return result
+
+    # ------------------------------------------------------------------
+    # pypdfium2 fallback for Windows PDF backend failures
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _looks_like_pdf_backend_failure(error: Exception) -> bool:
+        """Return True when *error* matches known docling PDF backend crashes."""
+        message = f"{type(error).__name__}: {error}"
+        return "std::bad_alloc" in message or "Stage preprocess failed" in message
+
+    def _parse_pdf_via_images(
+        self,
+        path: Path,
+        original_file_name: str,
+        detected_mime_type: str,
+    ) -> NormalizedDocument:
+        """Rasterise a PDF with pypdfium2 and process it through docling's
+        image pipeline.
+
+        This is a fallback for environments where the native docling PDF
+        backend (docling_parse / PDFium C++) is unstable (e.g. Windows).
+        """
+        import pypdfium2 as pdfium
+
+        pdf = pdfium.PdfDocument(str(path))
+        page_count = len(pdf)
+        if page_count > 200:
+            raise IngestionFailure(
+                "PDF_TOO_LARGE_FOR_FALLBACK",
+                f"PDF has {page_count} pages; pypdfium2 fallback supports ≤200.",
+                retryable=False,
+            )
+
+        temp_files: list[Path] = []
+        try:
+            for i in range(page_count):
+                bitmap = pdf[i].render(scale=2)
+                pil_image = bitmap.to_pil()
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                pil_image.save(tmp.name, format="PNG")
+                temp_files.append(Path(tmp.name))
+
+            # Feed rendered images to docling — this bypasses the C++ PDF
+            # backend and goes through the image→OCR→layout pipeline.
+            result = self._converter.convert(
+                [str(p) for p in temp_files],
+                raises_on_error=True,
+            )
+            document = result.document
+            logger.info(
+                "pypdfium2 fallback succeeded for %s (%d pages, %d elements)",
+                original_file_name,
+                page_count,
+                len(list(document.iterate_items())),
+            )
+        finally:
+            for tmp in temp_files:
+                try:
+                    tmp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
+        # Reuse the existing post-processing logic.
+        groups: dict[str, tuple[str | None, str | None]] = {}
+        for item, _depth in document.iterate_items(with_groups=True):
+            if type(item).__name__ == "GroupItem":
+                groups[item.self_ref] = (
+                    getattr(item, "name", None),
+                    self._label(item),
+                )
+
+        elements: list[NormalizedElement] = []
+        for item, depth in document.iterate_items():
+            text = self._text(item, document)
+            if not text.strip():
+                continue
+            label = self._label(item)
+            element_type = self._element_type(label, extension="pdf")
+            elements.append(
+                NormalizedElement(
+                    index=len(elements),
+                    type=element_type,
+                    text=text.strip(),
+                    heading_level=min(max(depth, 1), 12)
+                    if element_type in {ElementType.TITLE, ElementType.HEADING}
+                    else None,
+                    location=self._location(item, "pdf", groups),
+                    metadata={"doclingLabel": label, "selfRef": item.self_ref},
+                )
+            )
+
+        return NormalizedDocument(
+            title=Path(original_file_name).stem,
+            detected_mime_type=detected_mime_type,
+            parser_version=f"docling-pypdfium2-fallback/{version('docling')}",
+            elements=elements,
+            metadata={
+                "sourceFormat": "pdf",
+                "conversionStatus": str(result.status),
+                "fallback": "pypdfium2-rasterisation",
+            },
+        )

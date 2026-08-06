@@ -13,7 +13,7 @@ from pptx import Presentation
 from pptx.util import Inches, Pt as SlidePt
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
 
 
@@ -53,12 +53,58 @@ def _write_docx(path: Path, title: str, evidence: str) -> None:
     document.save(path)
 
 
+def _register_cjk_font() -> str:
+    """Register a CJK TrueType font and return its name.
+
+    Prefers static TTF fonts over variable fonts or TTC collections for
+    broader compatibility with PDF consumers (pypdf, docling).
+    """
+    import platform
+
+    # Order: static TTF → variable TTF → TTC collection
+    if platform.system() == "Windows":
+        candidates = (
+            "C:/Windows/Fonts/Deng.ttf",          # DengXian, shipping static CJK TTF
+            "C:/Windows/Fonts/msyh.ttf",
+            "C:/Windows/Fonts/simsun.ttf",
+            "C:/Windows/Fonts/NotoSansSC-VF.ttf", # variable font — works but less portable
+            "C:/Windows/Fonts/msyh.ttc",
+            "C:/Windows/Fonts/simsun.ttc",
+        )
+    elif platform.system() == "Darwin":
+        candidates = (
+            "/System/Library/Fonts/STHeiti Light.ttc",
+            "/System/Library/Fonts/PingFang.ttc",
+        )
+    else:
+        from glob import glob
+
+        candidates = tuple(
+            sorted(glob("/usr/share/fonts/**/*.ttf", recursive=True))
+            + sorted(glob("/usr/share/fonts/**/*.ttc", recursive=True))
+        )
+
+    for path in candidates:
+        try:
+            pdfmetrics.registerFont(TTFont("CJKFont", path))
+            return "CJKFont"
+        except Exception:
+            continue
+
+    raise RuntimeError(
+        "No CJK TrueType font found. Install CJK fonts or set a FONT_PATH env var."
+    )
+
+
 def _write_pdf(path: Path, title: str, evidence: str) -> None:
-    pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
+    # Use TrueType font so that ToUnicode CMap is embedded — text extraction
+    # tools (pypdf, docling) depend on it to decode Chinese glyphs back to
+    # Unicode.  CID fonts render correctly but lack this mapping.
+    _font_name = _register_cjk_font()
     canvas = Canvas(str(path), pagesize=A4)
-    canvas.setFont("STSong-Light", 18)
+    canvas.setFont(_font_name, 18)
     canvas.drawString(72, 780, title)
-    canvas.setFont("STSong-Light", 11)
+    canvas.setFont(_font_name, 11)
     y = 730
     for paragraph in ("适用范围：星桥云途内部运营使用。", evidence, "解释权归制度发布部门所有。"):
         canvas.drawString(72, y, paragraph)
