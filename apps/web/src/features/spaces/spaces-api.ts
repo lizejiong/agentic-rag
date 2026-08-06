@@ -13,7 +13,16 @@ export function listVisibleSpaces(fetcher: Fetcher, signal?: AbortSignal) {
 }
 
 export function createSpace(fetcher: Fetcher, input: { name: string; description?: string }) {
-  return requestJson({ schema: z.object({ id: z.uuid() }), input: '/api/spaces', fetcher, init: { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) } });
+  return requestJson({
+    schema: z.object({ id: z.uuid() }),
+    input: '/api/spaces',
+    fetcher,
+    init: {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+  });
 }
 
 export function updateSpace(
@@ -25,6 +34,10 @@ export function updateSpace(
     schema: visibleSpaceSchema,
     input: `/api/spaces/${spaceId}`,
     fetcher,
-    init: { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) },
+    init: {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+    },
   });
 }
