@@ -67,7 +67,7 @@ class FileValidator:
             if source.read(5) != b"%PDF-":
                 self._invalid_signature()
         try:
-            reader = PdfReader(path, strict=True)
+            reader = PdfReader(path, strict=False)
             if reader.is_encrypted:
                 raise IngestionFailure(
                     "ENCRYPTED_DOCUMENT_UNSUPPORTED",

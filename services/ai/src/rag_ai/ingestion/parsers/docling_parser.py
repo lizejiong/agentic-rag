@@ -278,29 +278,33 @@ class DoclingParser:
         import pypdfium2 as pdfium  # type: ignore[import-untyped]
 
         pdf = pdfium.PdfDocument(str(path))
-        page_count = len(pdf)
+        try:
+            page_count = len(pdf)
 
-        elements: list[NormalizedElement] = []
-        for i in range(page_count):
-            text = pdf[i].get_textpage().get_text_range().strip()
-            if not text:
-                continue
-            elements.append(
-                NormalizedElement(
-                    index=len(elements),
-                    type=ElementType.PARAGRAPH,
-                    text=text,
-                    location=SourceLocation(page=i + 1),
-                    metadata={"parser": "pypdfium2-native"},
+            elements: list[NormalizedElement] = []
+            for i in range(page_count):
+                text = pdf[i].get_textpage().get_text_range().strip()
+                if not text:
+                    continue
+                elements.append(
+                    NormalizedElement(
+                        index=len(elements),
+                        type=ElementType.PARAGRAPH,
+                        text=text,
+                        location=SourceLocation(page=i + 1),
+                        metadata={"parser": "pypdfium2-native"},
+                    )
                 )
-            )
 
-        logger.info(
-            "pypdfium2 text fallback: %d pages → %d elements for %s",
-            page_count,
-            len(elements),
-            original_file_name,
-        )
+            logger.info(
+                "pypdfium2 text fallback: %d pages → %d elements for %s",
+                page_count,
+                len(elements),
+                original_file_name,
+            )
+        finally:
+            pdf.close()
+
         return NormalizedDocument(
             title=Path(original_file_name).stem,
             detected_mime_type=detected_mime_type,
