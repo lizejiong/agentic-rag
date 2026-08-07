@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import platform
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -82,6 +83,21 @@ class DoclingParser:
                 "No Docling adapter is registered for this document format.",
                 retryable=False,
             )
+
+        # On Windows the docling C++ PDF backend (layout model) can segfault
+        # the entire process, not just throw an exception — the converter
+        # object enters a corrupted state and subsequent calls crash with
+        # SIGSEGV.  Bypass docling entirely for PDFs on Windows and go
+        # straight to pypdfium2 native text extraction.
+        if extension == "pdf" and platform.system() == "Windows":
+            logger.info(
+                "Windows detected — skipping docling PDF pipeline, using "
+                "pypdfium2 text extraction"
+            )
+            return self._parse_pdf_via_text_extraction(
+                path, original_file_name, detected_mime_type
+            )
+
         try:
             result = self._converter.convert(
                 path,
@@ -238,7 +254,12 @@ class DoclingParser:
     def _looks_like_pdf_backend_failure(error: Exception) -> bool:
         """Return True when *error* matches known docling PDF backend crashes."""
         message = f"{type(error).__name__}: {error}"
-        return "std::bad_alloc" in message or "Stage preprocess failed" in message
+        return (
+            "std::bad_alloc" in message
+            or "Stage preprocess failed" in message
+            or "not enough memory" in message
+            or "DefaultCPUAllocator" in message
+        )
 
     def _parse_pdf_via_text_extraction(
         self,
