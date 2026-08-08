@@ -25,17 +25,13 @@ class LexicalRepository:
                     "number_of_replicas": 0,
                     "analysis": {
                         "analyzer": {
-                            "default": {
-                                "type": "custom",
-                                "tokenizer": "standard",
-                                "filter": [
-                                    "lowercase",
-                                    "asciifolding",
-                                    "cjk_width",
-                                    "cjk_bigram",
-                                ],
-                            }
-                        }
+                            "ik_index": {
+                                "type": "ik_max_word",
+                            },
+                            "ik_search": {
+                                "type": "ik_smart",
+                            },
+                        },
                     },
                 },
                 "mappings": {
@@ -44,8 +40,16 @@ class LexicalRepository:
                         "document_id": {"type": "keyword"},
                         "version_id": {"type": "keyword"},
                         "space_id": {"type": "keyword"},
-                        "content": {"type": "text", "analyzer": "default"},
-                        "title": {"type": "text", "analyzer": "default"},
+                        "content": {
+                            "type": "text",
+                            "analyzer": "ik_index",
+                            "search_analyzer": "ik_search",
+                        },
+                        "title": {
+                            "type": "text",
+                            "analyzer": "ik_index",
+                            "search_analyzer": "ik_search",
+                        },
                         "is_searchable": {"type": "boolean"},
                         "location": {"type": "object", "enabled": False},
                         "acl_snapshot": {"type": "object", "enabled": False},

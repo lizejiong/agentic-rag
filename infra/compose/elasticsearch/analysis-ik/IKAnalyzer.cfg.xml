@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+    <comment>IK Analyzer 扩展配置 — atlas RAG 项目</comment>
+    <!-- 自定义分词词典（每行一个词） -->
+    <entry key="ext_dict">custom/atlas_terms.dic</entry>
+    <!-- 扩展停用词词典 -->
+    <entry key="ext_stopwords">custom/atlas_stopwords.dic</entry>
+</properties>

@@ -1,0 +1,18 @@
+# Extends the official Elasticsearch image with the analysis-ik plugin
+# for Chinese word segmentation.
+#
+# The plugin version MUST match the Elasticsearch version.
+ARG ES_VERSION=8.19.17
+FROM docker.elastic.co/elasticsearch/elasticsearch:${ES_VERSION}
+
+ARG ES_VERSION
+RUN elasticsearch-plugin install --batch \
+    https://release.infinilabs.com/analysis-ik/stable/elasticsearch-analysis-ik-${ES_VERSION}.zip
+
+# Overlay custom IK configuration and dictionaries on top of the plugin's
+# default files (main.dic, surname.dic, etc.).  We must COPY rather than
+# volume-mount so the defaults stay in place.
+COPY elasticsearch/analysis-ik/IKAnalyzer.cfg.xml \
+     /usr/share/elasticsearch/config/analysis-ik/IKAnalyzer.cfg.xml
+COPY elasticsearch/analysis-ik/custom/ \
+     /usr/share/elasticsearch/config/analysis-ik/custom/
