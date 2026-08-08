@@ -53,8 +53,6 @@ def _write_docx(path: Path, title: str, evidence: str) -> None:
 
 def _cjk_font_path() -> str:
     """Return a path to a CJK TrueType font on the current system."""
-    import platform
-
     if platform.system() == "Windows":
         candidates = [
             "C:/Windows/Fonts/Deng.ttf",
