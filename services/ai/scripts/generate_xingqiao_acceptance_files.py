@@ -11,10 +11,8 @@ from docx.shared import Pt
 from openpyxl import Workbook
 from pptx import Presentation
 from pptx.util import Inches, Pt as SlidePt
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfgen.canvas import Canvas
+from fpdf import FPDF
+import platform
 
 
 FIXTURES = {
@@ -53,63 +51,52 @@ def _write_docx(path: Path, title: str, evidence: str) -> None:
     document.save(path)
 
 
-def _register_cjk_font() -> str:
-    """Register a CJK TrueType font and return its name.
-
-    Prefers static TTF fonts over variable fonts or TTC collections for
-    broader compatibility with PDF consumers (pypdf, docling).
-    """
-    import platform
-
-    # Order: static TTF → variable TTF → TTC collection
+def _cjk_font_path() -> str:
+    """Return a path to a CJK TrueType font on the current system."""
     if platform.system() == "Windows":
-        candidates = (
-            "C:/Windows/Fonts/Deng.ttf",          # DengXian, shipping static CJK TTF
+        candidates = [
+            "C:/Windows/Fonts/Deng.ttf",
             "C:/Windows/Fonts/msyh.ttf",
             "C:/Windows/Fonts/simsun.ttf",
-            "C:/Windows/Fonts/NotoSansSC-VF.ttf", # variable font — works but less portable
+            "C:/Windows/Fonts/NotoSansSC-VF.ttf",
             "C:/Windows/Fonts/msyh.ttc",
             "C:/Windows/Fonts/simsun.ttc",
-        )
+        ]
     elif platform.system() == "Darwin":
-        candidates = (
+        candidates = [
             "/System/Library/Fonts/STHeiti Light.ttc",
             "/System/Library/Fonts/PingFang.ttc",
-        )
+        ]
     else:
         from glob import glob
 
-        candidates = tuple(
-            sorted(glob("/usr/share/fonts/**/*.ttf", recursive=True))
-            + sorted(glob("/usr/share/fonts/**/*.ttc", recursive=True))
+        candidates = list(glob("/usr/share/fonts/**/*.ttf", recursive=True)) + list(
+            glob("/usr/share/fonts/**/*.ttc", recursive=True)
         )
 
     for path in candidates:
-        try:
-            pdfmetrics.registerFont(TTFont("CJKFont", path))
-            return "CJKFont"
-        except Exception:
-            continue
+        if Path(path).exists():
+            return path
 
-    raise RuntimeError(
-        "No CJK TrueType font found. Install CJK fonts or set a FONT_PATH env var."
-    )
+    raise RuntimeError("No CJK font found. Install CJK fonts or set FONT_PATH env var.")
 
 
 def _write_pdf(path: Path, title: str, evidence: str) -> None:
-    # Use TrueType font so that ToUnicode CMap is embedded — text extraction
-    # tools (pypdf, docling) depend on it to decode Chinese glyphs back to
-    # Unicode.  CID fonts render correctly but lack this mapping.
-    _font_name = _register_cjk_font()
-    canvas = Canvas(str(path), pagesize=A4)
-    canvas.setFont(_font_name, 18)
-    canvas.drawString(72, 780, title)
-    canvas.setFont(_font_name, 11)
-    y = 730
-    for paragraph in ("适用范围：星桥云途内部运营使用。", evidence, "解释权归制度发布部门所有。"):
-        canvas.drawString(72, y, paragraph)
-        y -= 36
-    canvas.save()
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.add_font("CJK", "", _cjk_font_path())
+    pdf.set_font("CJK", "", 18)
+    pdf.cell(0, 14, title)
+    pdf.ln(20)
+    pdf.set_font("CJK", "", 11)
+    for paragraph in [
+        "适用范围：星桥云途内部运营使用。",
+        evidence,
+        "解释权归制度发布部门所有。",
+    ]:
+        pdf.cell(0, 10, paragraph)
+        pdf.ln(14)
+    pdf.output(str(path))
 
 
 def _write_xlsx(path: Path, title: str, rows: list[list[object]]) -> None:

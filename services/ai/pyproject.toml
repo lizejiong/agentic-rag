@@ -29,6 +29,7 @@ dependencies = [
   "openpyxl>=3.1,<4",
   "uvicorn>=0.35,<1",
   "pypdfium2>=5.12.1",
+  "fpdf2",
 ]
 
 [dependency-groups]

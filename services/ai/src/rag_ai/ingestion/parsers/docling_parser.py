@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-import tempfile
+import platform
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -83,6 +83,21 @@ class DoclingParser:
                 "No Docling adapter is registered for this document format.",
                 retryable=False,
             )
+
+        # On Windows the docling C++ PDF backend (layout model) can segfault
+        # the entire process, not just throw an exception — the converter
+        # object enters a corrupted state and subsequent calls crash with
+        # SIGSEGV.  Bypass docling entirely for PDFs on Windows and go
+        # straight to pypdfium2 native text extraction.
+        if extension == "pdf" and platform.system() == "Windows":
+            logger.info(
+                "Windows detected — skipping docling PDF pipeline, using "
+                "pypdfium2 text extraction"
+            )
+            return self._parse_pdf_via_text_extraction(
+                path, original_file_name, detected_mime_type
+            )
+
         try:
             result = self._converter.convert(
                 path,
@@ -99,14 +114,19 @@ class DoclingParser:
             if extension == "pdf" and self._looks_like_pdf_backend_failure(error):
                 logger.warning(
                     "Docling PDF pipeline failed, falling back to pypdfium2 "
-                    "rasterisation: %s",
+                    "text extraction: %s",
                     error,
                 )
                 try:
-                    return self._parse_pdf_via_images(
+                    return self._parse_pdf_via_text_extraction(
                         path, original_file_name, detected_mime_type
                     )
                 except Exception as fallback_error:
+                    logger.error(
+                        "pypdfium2 fallback also failed: %s",
+                        fallback_error,
+                        exc_info=True,
+                    )
                     raise IngestionFailure(
                         "DOCUMENT_PARSE_FAILED",
                         "Docling PDF pipeline failed and pypdfium2 fallback also failed.",
@@ -234,113 +254,64 @@ class DoclingParser:
     def _looks_like_pdf_backend_failure(error: Exception) -> bool:
         """Return True when *error* matches known docling PDF backend crashes."""
         message = f"{type(error).__name__}: {error}"
-        return "std::bad_alloc" in message or "Stage preprocess failed" in message
+        return (
+            "std::bad_alloc" in message
+            or "Stage preprocess failed" in message
+            or "not enough memory" in message
+            or "DefaultCPUAllocator" in message
+        )
 
-    def _parse_pdf_via_images(
+    def _parse_pdf_via_text_extraction(
         self,
         path: Path,
         original_file_name: str,
         detected_mime_type: str,
     ) -> NormalizedDocument:
-        """Rasterise a PDF with pypdfium2 and process it through docling's
-        image pipeline.
+        """Extract text directly from a PDF using pypdfium2's built-in text
+        layer, bypassing docling entirely.
 
-        This is a fallback for environments where the native docling PDF
-        backend (docling_parse / PDFium C++) is unstable (e.g. Windows).
+        This is a fallback for environments where docling's PDF pipeline
+        (layout model preprocessing) crashes (e.g. Windows std::bad_alloc).
+        It trades layout awareness for reliability—the result has one
+        paragraph-level element per page.
         """
         import pypdfium2 as pdfium  # type: ignore[import-untyped]
 
-        from PIL import Image
-
         pdf = pdfium.PdfDocument(str(path))
-        page_count = len(pdf)
-        if page_count > 200:
-            raise IngestionFailure(
-                "PDF_TOO_LARGE_FOR_FALLBACK",
-                f"PDF has {page_count} pages; pypdfium2 fallback supports ≤200.",
-                retryable=False,
-            )
-
-        # Render all pages and stitch into a single tall image so that
-        # docling's convert() (which only accepts a single input) can
-        # process the entire document in one call.
-        page_images: list[Image.Image] = []
-        for i in range(page_count):
-            bitmap = pdf[i].render(scale=2)
-            page_images.append(bitmap.to_pil())
-
-        combined = _stitch_vertically(page_images)
-        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        tmp_path = Path(tmp.name)
         try:
-            combined.save(str(tmp_path), format="PNG")
-            result = self._converter.convert(tmp_path, raises_on_error=True)
-            document = result.document
+            page_count = len(pdf)
+
+            elements: list[NormalizedElement] = []
+            for i in range(page_count):
+                text = pdf[i].get_textpage().get_text_range().strip()
+                if not text:
+                    continue
+                elements.append(
+                    NormalizedElement(
+                        index=len(elements),
+                        type=ElementType.PARAGRAPH,
+                        text=text,
+                        location=SourceLocation(page=i + 1),
+                        metadata={"parser": "pypdfium2-native"},
+                    )
+                )
+
             logger.info(
-                "pypdfium2 fallback succeeded for %s (%d pages, %d elements)",
-                original_file_name,
+                "pypdfium2 text fallback: %d pages → %d elements for %s",
                 page_count,
-                len(list(document.iterate_items())),
+                len(elements),
+                original_file_name,
             )
         finally:
-            try:
-                tmp_path.unlink(missing_ok=True)
-            except OSError:
-                pass
-
-        # Reuse the existing post-processing logic.
-        groups: dict[str, tuple[str | None, str | None]] = {}
-        for item, _depth in document.iterate_items(with_groups=True):
-            if type(item).__name__ == "GroupItem":
-                groups[item.self_ref] = (
-                    getattr(item, "name", None),
-                    self._label(item),
-                )
-
-        elements: list[NormalizedElement] = []
-        for item, depth in document.iterate_items():
-            text = self._text(item, document)
-            if not text.strip():
-                continue
-            label = self._label(item)
-            element_type = self._element_type(label, extension="pdf")
-            elements.append(
-                NormalizedElement(
-                    index=len(elements),
-                    type=element_type,
-                    text=text.strip(),
-                    heading_level=min(max(depth, 1), 12)
-                    if element_type in {ElementType.TITLE, ElementType.HEADING}
-                    else None,
-                    location=self._location(item, "pdf", groups),
-                    metadata={"doclingLabel": label, "selfRef": item.self_ref},
-                )
-            )
+            pdf.close()
 
         return NormalizedDocument(
             title=Path(original_file_name).stem,
             detected_mime_type=detected_mime_type,
-            parser_version=f"docling-pypdfium2-fallback/{version('docling')}",
+            parser_version=f"pypdfium2/{version('pypdfium2')}",
             elements=elements,
             metadata={
                 "sourceFormat": "pdf",
-                "conversionStatus": str(result.status),
-                "fallback": "pypdfium2-rasterisation",
+                "fallback": "pypdfium2-text-extraction",
             },
         )
-
-
-def _stitch_vertically(images: list[Any]) -> Any:
-    """Concatenate PIL images top-to-bottom into a single image."""
-    if not images:
-        raise ValueError("At least one image required")
-    if len(images) == 1:
-        return images[0]
-    total_height = sum(img.height for img in images)
-    max_width = max(img.width for img in images)
-    canvas = images[0].__class__("RGB", (max_width, total_height), (255, 255, 255))
-    y_offset = 0
-    for img in images:
-        canvas.paste(img, (0, y_offset))
-        y_offset += img.height
-    return canvas
