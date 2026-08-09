@@ -88,7 +88,7 @@ export class SpacesService {
   }
 
   async update(user: AuthenticatedUser, id: string, input: SpaceSettingsInput) {
-    await this.policy.require(user, id, 'EDIT');
+    await this.policy.require(user, id, 'MANAGE');
     return this.revision.mutate(
       async (transaction) => {
         const current = await transaction.knowledgeSpace.findUnique({ where: { id } });

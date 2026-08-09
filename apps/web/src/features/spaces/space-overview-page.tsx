@@ -29,6 +29,7 @@ export function SpaceOverviewPage() {
       embeddingEnabled?: boolean;
       rerankerEnabled?: boolean;
       llmEnabled?: boolean;
+      graphExtractionEnabled?: boolean;
     }) => updateSpace(auth.authorizedFetch, spaceId, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: visibleSpacesQueryKey });
@@ -75,6 +76,12 @@ export function SpaceOverviewPage() {
             成员与权限
           </Link>
         ) : null}
+        <Link
+          className="border-b-2 border-transparent px-4 py-3 text-sm text-slate-500 hover:text-slate-900"
+          to={`/spaces/${spaceId}/graph`}
+        >
+          知识图谱
+        </Link>
       </nav>
       <section className="grid grid-cols-3 gap-5" aria-label="空间统计">
         <StatCard
@@ -123,6 +130,13 @@ export function SpaceOverviewPage() {
               enabled={space?.llmEnabled ?? false}
               loading={toggleMutation.isPending}
               onChange={(value) => toggleMutation.mutate({ llmEnabled: value })}
+            />
+            <ToggleRow
+              label="图谱候选抽取"
+              description="文档完成索引后提取候选实体和关系，需审核发布后才会服务"
+              enabled={space?.graphExtractionEnabled ?? false}
+              loading={toggleMutation.isPending}
+              onChange={(value) => toggleMutation.mutate({ graphExtractionEnabled: value })}
             />
           </div>
         </section>
