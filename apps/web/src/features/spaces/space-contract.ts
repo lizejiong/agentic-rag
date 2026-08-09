@@ -9,6 +9,7 @@ export const visibleSpaceSchema = z.object({
   embeddingEnabled: z.boolean().optional(),
   rerankerEnabled: z.boolean().optional(),
   llmEnabled: z.boolean().optional(),
+  graphExtractionEnabled: z.boolean().optional(),
 });
 
 export const visibleSpacesSchema = z.array(visibleSpaceSchema);

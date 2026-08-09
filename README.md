@@ -21,7 +21,7 @@ Atlas RAG 是一个面向企业知识场景的 Agentic RAG 项目。目标能力
 - pgvector + Elasticsearch 混合检索、RRF、Reranker、引用、检索摘要和 Redis 会话记忆
 - OpenAI 兼容的 Embedding/Chat 模型适配与真实模型连接检查
 
-Neo4j 图谱治理、长期记忆、LangGraph 扩展路由、评测中心、语音和可观测性仍在后续阶段，详见
+Neo4j 图谱治理现已提供候选抽取、证据审核发布、关系浏览、路径查询和聊天只读证据补充；长期记忆、LangGraph 扩展路由、语音和可观测性仍在后续阶段，详见
 [总路线图](docs/superpowers/plans/2026-07-18-enterprise-rag-master-roadmap.md)。
 
 ## 工作区

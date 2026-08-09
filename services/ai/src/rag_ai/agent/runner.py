@@ -20,6 +20,7 @@ from rag_ai.contracts.agent_events import (
     TextDelta,
 )
 from rag_ai.models.base import ChatMessage, ChatModel
+from rag_ai.graph.query_tool import GraphQueryTool
 from rag_ai.retrieval.evidence_selector import EvidenceSelector
 from rag_ai.retrieval.models import AclSnapshot, CitationLocation as DomainCitationLocation, RankedChunk, RetrievalSummary, RetrievalTrace, SpacePolicy
 from rag_ai.retrieval.service import RetrievalService
@@ -69,12 +70,14 @@ class Agent:
         chat: ChatModel,
         *,
         evidence_selector: EvidenceSelector | None = None,
+        graph_query: GraphQueryTool | None = None,
         evidence_threshold: float = 0.15,
         max_rewrites: int = 1,
     ) -> None:
         self._retrieval = retrieval
         self._chat = chat
         self._evidence_selector = evidence_selector or EvidenceSelector()
+        self._graph_query = graph_query
         self._evidence_threshold = evidence_threshold
         self._max_rewrites = max_rewrites
 
@@ -209,6 +212,13 @@ class Agent:
             ranked, summary = await self._retrieval.retrieve(
                 query, state.selected_space_ids, state.acl, state.policies
             )
+            if self._graph_query is not None:
+                try:
+                    graph_chunks = await self._graph_query.query(query, state.selected_space_ids, state.acl)
+                    known_chunks = {item.chunk.chunk_id for item in ranked}
+                    ranked.extend(item for item in graph_chunks if item.chunk.chunk_id not in known_chunks)
+                except Exception:
+                    logger.exception("Graph query failed; continuing with document retrieval")
             state.summary = summary
             state.retrieval_trace = summary.trace
             state.chunks = ranked

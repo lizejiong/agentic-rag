@@ -9,6 +9,7 @@ import { DashboardPage } from '../features/dashboard/dashboard-page';
 import { DocumentListPage } from '../features/documents/document-list-page';
 import { DocumentDetailPage } from '../features/documents/document-detail-page';
 import { EvaluationPage } from '../features/evaluation/evaluation-page';
+import { GraphPage } from '../features/graph/graph-page';
 import { SearchTestPage } from '../features/search/search-test-page';
 import { SpaceOverviewPage } from '../features/spaces/space-overview-page';
 import { SpacesPage } from '../features/spaces/spaces-page';
@@ -40,6 +41,7 @@ export function AppRouter() {
           <Route path="/spaces/:spaceId" element={<SpaceOverviewPage />} />
           <Route path="/spaces/:spaceId/documents" element={<DocumentListPage />} />
           <Route path="/spaces/:spaceId/members" element={<SpaceMembersPage />} />
+          <Route path="/spaces/:spaceId/graph" element={<GraphPage />} />
           <Route path="/documents/:documentId" element={<DocumentDetailPage />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/evaluation" element={<EvaluationPage />} />

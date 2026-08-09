@@ -30,6 +30,7 @@ dependencies = [
   "uvicorn>=0.35,<1",
   "pypdfium2>=5.12.1",
   "fpdf2",
+  "neo4j>=5.28,<6",
 ]
 
 [dependency-groups]

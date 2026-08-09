@@ -28,7 +28,7 @@ export function createSpace(fetcher: Fetcher, input: { name: string; description
 export function updateSpace(
   fetcher: Fetcher,
   spaceId: string,
-  input: { embeddingEnabled?: boolean; rerankerEnabled?: boolean; llmEnabled?: boolean },
+  input: { embeddingEnabled?: boolean; rerankerEnabled?: boolean; llmEnabled?: boolean; graphExtractionEnabled?: boolean },
 ) {
   return requestJson({
     schema: visibleSpaceSchema,

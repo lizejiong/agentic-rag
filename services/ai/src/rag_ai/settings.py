@@ -118,6 +118,12 @@ class WorkerSettings(DatabaseSettings):
     memory_window_turns: int = Field(default=10, ge=0, le=100)
     memory_ttl_seconds: int = Field(default=86_400, ge=60, le=7_776_000)
 
+    neo4j_uri: str = Field(default="bolt://127.0.0.1:7687", min_length=1)
+    neo4j_user: str = Field(default="neo4j", min_length=1)
+    neo4j_password: str = Field(default="", min_length=0)
+    graph_extraction_version: str = Field(default="v1", min_length=1, max_length=80)
+    graph_query_limit: int = Field(default=5, ge=1, le=20)
+
 
 @lru_cache
 def get_worker_settings() -> WorkerSettings:

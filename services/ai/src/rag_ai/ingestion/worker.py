@@ -5,6 +5,7 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Protocol
+from uuid import UUID
 
 from pydantic import ValidationError
 
@@ -38,6 +39,10 @@ class ChunkIndexer(Protocol):
     ) -> None: ...
 
 
+class GraphExtractor(Protocol):
+    async def extract_version(self, version_id: UUID) -> int: ...
+
+
 class DurableIngestionWorker:
     def __init__(
         self,
@@ -45,6 +50,7 @@ class DurableIngestionWorker:
         repository: IngestionRepository,
         processor: IngestionProcessor,
         indexer: ChunkIndexer | None = None,
+        graph_extractor: GraphExtractor | None = None,
         *,
         dead_letter_stream: str,
         batch_size: int,
@@ -54,6 +60,7 @@ class DurableIngestionWorker:
         self._repository = repository
         self._processor = processor
         self._indexer = indexer
+        self._graph_extractor = graph_extractor
         self._dead_letter_stream = dead_letter_stream
         self._batch_size = batch_size
         self._block_milliseconds = block_milliseconds
@@ -121,6 +128,11 @@ class DurableIngestionWorker:
                     # is searchable via lexical index on retry. We do not fail the
                     # whole run here to avoid re-parsing. A reconciliation task
                     # will retry missing embeddings/ES records.
+            if self._graph_extractor is not None:
+                try:
+                    await self._graph_extractor.extract_version(command.payload.version_id)
+                except Exception:
+                    logger.exception("Graph extraction failed after indexing", extra={"event_id": str(envelope.event_id)})
         except IngestionFailure as ingestion_failure:
             await self._repository.fail(command, ingestion_failure, stage)
         except Exception:

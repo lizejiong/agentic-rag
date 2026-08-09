@@ -9,6 +9,7 @@ import { CitationsModule } from './citations/citations.module';
 import { DocumentsModule } from './documents/documents.module';
 import { EvaluationModule } from './evaluation/evaluation.module';
 import { HealthController } from './health/health.controller';
+import { GraphModule } from './graph/graph.module';
 import { ConfigurationModule } from './infrastructure/config/configuration.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { ObjectStorageModule } from './infrastructure/object-storage/object-storage.module';
@@ -31,6 +32,7 @@ import { UsersModule } from './users/users.module';
     OrganizationModule,
     SpacesModule,
     DocumentsModule,
+    GraphModule,
     EvaluationModule,
     SearchModule,
     CitationsModule,

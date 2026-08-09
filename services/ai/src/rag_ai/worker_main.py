@@ -21,6 +21,7 @@ from rag_ai.ingestion.worker import (
     WorkerRuntime,
 )
 from rag_ai.models.factory import create_embedding_model
+from rag_ai.graph.factory import build_graph_service
 from rag_ai.retrieval.indexer import ChunkIndexer as ConcreteChunkIndexer
 from rag_ai.retrieval.lexical_repository import LexicalRepository
 from rag_ai.settings import get_worker_settings
@@ -85,6 +86,7 @@ async def run_worker() -> None:
         repository,
         pipeline,
         indexer=indexer,
+        graph_extractor=build_graph_service(settings),
         dead_letter_stream=settings.event_dead_letter_stream,
         batch_size=settings.worker_batch_size,
         block_milliseconds=settings.worker_block_milliseconds,

@@ -4,6 +4,8 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from rag_ai.agent.runner import Agent
+from rag_ai.graph.factory import build_graph_service
+from rag_ai.graph.query_tool import GraphQueryTool
 from rag_ai.memory.session_memory import RedisSessionMemoryStore
 from rag_ai.models.base import ChatModel, EmbeddingModel, Reranker
 from rag_ai.models.factory import create_chat_model, create_embedding_model, create_reranker
@@ -106,4 +108,5 @@ def build_agent(
             base_url=settings.llm_base_url or settings.openai_base_url,
         ),
         evidence_selector=build_evidence_selector(settings),
+        graph_query=GraphQueryTool(build_graph_service(settings), limit=settings.graph_query_limit),
     )
