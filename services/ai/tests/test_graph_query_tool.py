@@ -36,5 +36,6 @@ async def test_graph_query_requires_space_access_and_keeps_original_chunk_identi
 
     assert denied == []
     assert service.calls == 1
-    assert allowed[0].chunk.document_id == service.relation.evidence[0].document_id
-    assert allowed[0].chunk.chunk_id == service.relation.evidence[0].chunk_id
+    assert allowed[0].evidence.chunk.document_id == service.relation.evidence[0].document_id
+    assert allowed[0].evidence.chunk.chunk_id == service.relation.evidence[0].chunk_id
+    assert allowed[0].evidence.rerank_score is None

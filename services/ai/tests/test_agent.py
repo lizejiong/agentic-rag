@@ -80,6 +80,7 @@ def _ranked(text: str, score: float = 0.5) -> RankedChunk:
 @pytest.mark.asyncio
 async def test_agent_returns_answer_with_citations() -> None:
     chunk = _ranked("The answer is 42.")
+    space_id = chunk.chunk.space_id
     agent = Agent(retrieval=FakeRetrieval([chunk]), chat=EchoChatModel())
     events = []
     async for event in agent.run(
@@ -87,9 +88,9 @@ async def test_agent_returns_answer_with_citations() -> None:
         trace_id="trace",
         actor_id="actor",
         query="what is the answer?",
-        selected_space_ids=[],
-        acl=AclSnapshot(user_id=uuid4(), admin=False, group_ids=[], spaces={}),
-        policies=[SpacePolicy(uuid4(), True, True, True)],
+        selected_space_ids=[space_id],
+        acl=AclSnapshot(user_id=uuid4(), admin=False, group_ids=[], spaces={space_id: "VIEW"}),
+        policies=[SpacePolicy(space_id, True, True, True)],
         history=[],
         cancelled=asyncio.Event(),
     ):
@@ -104,16 +105,18 @@ async def test_agent_returns_answer_with_citations() -> None:
 
 @pytest.mark.asyncio
 async def test_agent_does_not_repeat_answer_when_citations_are_added() -> None:
-    agent = Agent(retrieval=FakeRetrieval([_ranked("Supporting evidence.")]), chat=PlainChatModel())
+    chunk = _ranked("Supporting evidence.")
+    space_id = chunk.chunk.space_id
+    agent = Agent(retrieval=FakeRetrieval([chunk]), chat=PlainChatModel())
     events = []
     async for event in agent.run(
         request_id=uuid4(),
         trace_id="trace",
         actor_id="actor",
         query="question",
-        selected_space_ids=[],
-        acl=AclSnapshot(user_id=uuid4(), admin=False, group_ids=[], spaces={}),
-        policies=[SpacePolicy(uuid4(), True, True, True)],
+        selected_space_ids=[space_id],
+        acl=AclSnapshot(user_id=uuid4(), admin=False, group_ids=[], spaces={space_id: "VIEW"}),
+        policies=[SpacePolicy(space_id, True, True, True)],
         history=[],
         cancelled=asyncio.Event(),
     ):
@@ -127,15 +130,16 @@ async def test_agent_does_not_repeat_answer_when_citations_are_added() -> None:
 @pytest.mark.asyncio
 async def test_agent_declines_when_no_evidence() -> None:
     agent = Agent(retrieval=FakeRetrieval([]), chat=EchoChatModel())
+    space_id = uuid4()
     events = []
     async for event in agent.run(
         request_id=uuid4(),
         trace_id="trace",
         actor_id="actor",
         query="unknown",
-        selected_space_ids=[],
-        acl=AclSnapshot(user_id=uuid4(), admin=False, group_ids=[], spaces={}),
-        policies=[SpacePolicy(uuid4(), True, True, True)],
+        selected_space_ids=[space_id],
+        acl=AclSnapshot(user_id=uuid4(), admin=False, group_ids=[], spaces={space_id: "VIEW"}),
+        policies=[SpacePolicy(space_id, True, True, True)],
         history=[],
         cancelled=asyncio.Event(),
     ):
@@ -148,6 +152,7 @@ async def test_agent_declines_when_no_evidence() -> None:
 @pytest.mark.asyncio
 async def test_agent_respects_cancel_event() -> None:
     chunk = _ranked("Long content that will be streamed.")
+    space_id = chunk.chunk.space_id
     agent = Agent(retrieval=FakeRetrieval([chunk]), chat=EchoChatModel())
     cancelled = asyncio.Event()
 
@@ -157,9 +162,9 @@ async def test_agent_respects_cancel_event() -> None:
         trace_id="trace",
         actor_id="actor",
         query="stream",
-        selected_space_ids=[],
-        acl=AclSnapshot(user_id=uuid4(), admin=False, group_ids=[], spaces={}),
-        policies=[SpacePolicy(uuid4(), True, True, True)],
+        selected_space_ids=[space_id],
+        acl=AclSnapshot(user_id=uuid4(), admin=False, group_ids=[], spaces={space_id: "VIEW"}),
+        policies=[SpacePolicy(space_id, True, True, True)],
         history=[],
         cancelled=cancelled,
     ):
