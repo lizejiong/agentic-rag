@@ -72,7 +72,7 @@ class GraphRepository:
                 JOIN rag.graph_evidence e ON e.relation_id=r.id AND e.active=TRUE
                 JOIN rag.chunks c ON c.id=e.chunk_id AND c.is_searchable=TRUE JOIN rag.normalized_documents n ON n.id=c.normalized_document_id
                 JOIN app.documents d ON d.id=e.document_id AND d.active_version_id=e.version_id AND d.availability='ACTIVE'
-                WHERE r.space_id=:space_id AND (:status IS NULL OR r.status=:status)
+                WHERE r.space_id=:space_id AND (CAST(:status AS VARCHAR(24)) IS NULL OR r.status=:status)
                   AND (:query='' OR se.canonical_name ILIKE :like_query OR oe.canonical_name ILIKE :like_query OR r.predicate ILIKE :like_query)
                 ORDER BY r.updated_at DESC LIMIT :limit
             """), {"space_id": space_id, "status": status, "query": query, "like_query": f"%{query}%", "limit": limit})).mappings().all()
@@ -96,10 +96,20 @@ class GraphRepository:
         async with self._engine.begin() as connection:
             await connection.execute(text("""
                 UPDATE rag.graph_evidence e SET active=FALSE
-                FROM rag.graph_relations r LEFT JOIN app.documents d ON d.id=e.document_id
-                LEFT JOIN rag.chunks c ON c.id=e.chunk_id
+                FROM rag.graph_relations r
                 WHERE e.relation_id=r.id AND r.space_id=:space_id
-                  AND (d.active_version_id IS DISTINCT FROM e.version_id OR d.availability <> 'ACTIVE' OR c.is_searchable IS DISTINCT FROM TRUE)
+                  AND (
+                    NOT EXISTS (
+                      SELECT 1 FROM app.documents d
+                      WHERE d.id=e.document_id
+                        AND d.active_version_id=e.version_id
+                        AND d.availability='ACTIVE'
+                    )
+                    OR NOT EXISTS (
+                      SELECT 1 FROM rag.chunks c
+                      WHERE c.id=e.chunk_id AND c.is_searchable=TRUE
+                    )
+                  )
             """), {"space_id": space_id})
             stale = await connection.execute(text("""
                 UPDATE rag.graph_relations r SET status='STALE', updated_at=NOW()
