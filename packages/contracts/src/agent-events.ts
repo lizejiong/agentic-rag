@@ -24,6 +24,9 @@ const retrievalPathSummary = z.object({
 
 const retrievalSummary = z.object({
   query: z.string(),
+  originalQuery: z.string(),
+  contextualized: z.boolean(),
+  attempt: z.int().positive(),
   vectorTopK: z.int().nonnegative(),
   lexicalTopK: z.int().nonnegative(),
   rrfK: z.int().nonnegative(),
