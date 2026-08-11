@@ -148,6 +148,29 @@ export class SpacesService {
     );
   }
 
+  async delete(user: AuthenticatedUser, id: string): Promise<void> {
+    await this.policy.require(user, id, 'MANAGE');
+    await this.revision.mutate(
+      async (transaction) => {
+        const result = await transaction.knowledgeSpace.updateMany({
+          where: { id, status: 'ACTIVE' },
+          data: { status: 'ARCHIVED' },
+        });
+        if (result.count === 0) {
+          throw new NotFoundException('SPACE_NOT_FOUND');
+        }
+      },
+      {
+        action: 'space.delete',
+        targetType: 'KNOWLEDGE_SPACE',
+        targetId: id,
+        eventType: 'space.deleted',
+        resourceId: id,
+        payload: { status: 'ARCHIVED' },
+      },
+    );
+  }
+
   async upsertGrant(
     user: AuthenticatedUser,
     spaceId: string,

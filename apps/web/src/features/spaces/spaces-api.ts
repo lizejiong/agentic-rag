@@ -41,3 +41,8 @@ export function updateSpace(
     },
   });
 }
+
+export async function deleteSpace(fetcher: Fetcher, spaceId: string): Promise<void> {
+  const response = await fetcher(`/api/spaces/${spaceId}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`DELETE_SPACE_HTTP_${response.status}`);
+}
