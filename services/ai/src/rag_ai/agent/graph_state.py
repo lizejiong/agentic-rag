@@ -17,6 +17,7 @@ class AgentGraphState(TypedDict, total=False):
     actor_id: str
     query: str
     effective_query: str
+    contextualized: bool
     selected_space_ids: list[UUID]
     acl: AclSnapshot
     policies: list[SpacePolicy]

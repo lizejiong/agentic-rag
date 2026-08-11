@@ -136,9 +136,10 @@ class Agent:
         selected_space_ids: list[UUID],
         acl: AclSnapshot,
         policies: list[SpacePolicy],
+        history: list[ChatMessage] | None = None,
     ) -> AgentResult:
         state = await self._workflow.ainvoke(_initial_state(
-            request_id, trace_id, actor_id, query, selected_space_ids, acl, policies, []
+            request_id, trace_id, actor_id, query, selected_space_ids, acl, policies, history or []
         ))
         citations = [
             _citation_from_chunk(chunk, request_id=request_id, trace_id=trace_id, seq=index)
@@ -166,6 +167,7 @@ def _initial_state(
         "actor_id": actor_id,
         "query": query,
         "effective_query": query,
+        "contextualized": False,
         "selected_space_ids": selected_space_ids,
         "acl": acl,
         "policies": policies,
@@ -193,7 +195,14 @@ def _map_event(
     if event_type == "retrieval":
         return RetrievalSummaryEvent(
             requestId=request_id, traceId=trace_id, seq=seq, occurredAt=occurred_at,
-            type="retrieval.summary", summary=_summary_to_event(event["summary"], event["attempt"], event["query"]),
+            type="retrieval.summary",
+            summary=_summary_to_event(
+                event["summary"],
+                event["attempt"],
+                event["query"],
+                event["original_query"],
+                event["contextualized"],
+            ),
         )
     if event_type == "token":
         return TextDelta(
@@ -205,9 +214,17 @@ def _map_event(
     return None
 
 
-def _summary_to_event(summary: RetrievalSummary, attempt: int, query: str) -> dict[str, Any]:
+def _summary_to_event(
+    summary: RetrievalSummary,
+    attempt: int,
+    query: str,
+    original_query: str,
+    contextualized: bool,
+) -> dict[str, Any]:
     return {
         "query": query,
+        "originalQuery": original_query,
+        "contextualized": contextualized,
         "attempt": attempt,
         "vectorTopK": summary.vector_top_k,
         "lexicalTopK": summary.lexical_top_k,

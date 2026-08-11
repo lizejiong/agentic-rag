@@ -12,7 +12,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 
 from rag_ai.agent.context_builder import ContextBuilder, ContextEvidence, GraphEvidenceCandidate
-from rag_ai.agent.decision import classify_question
+from rag_ai.agent.conversation import resolve_retrieval_query
+from rag_ai.agent.decision import QuestionProfile, classify_question
 from rag_ai.agent.graph_state import AgentGraphState
 from rag_ai.graph.query_tool import GraphQueryTool
 from rag_ai.models.base import ChatMessage, ChatModel
@@ -87,6 +88,7 @@ class AgentWorkflow:
     def _compile(self):
         graph = StateGraph(AgentGraphState, context_schema=WorkflowRuntimeContext)
         graph.add_node("understand", self._understand)
+        graph.add_node("contextualize", self._contextualize)
         graph.add_node("retrieve", self._retrieve)
         graph.add_node("rank", self._rank)
         graph.add_node("rewrite", self._rewrite)
@@ -94,7 +96,8 @@ class AgentWorkflow:
         graph.add_node("clarify", self._clarify)
         graph.add_node("refuse", self._refuse)
         graph.add_edge(START, "understand")
-        graph.add_conditional_edges("understand", _initial_route, {
+        graph.add_edge("understand", "contextualize")
+        graph.add_conditional_edges("contextualize", _initial_route, {
             "retrieve": "retrieve", "clarify": "clarify", "refuse": "refuse",
         })
         graph.add_edge("retrieve", "rank")
@@ -116,10 +119,32 @@ class AgentWorkflow:
         visible = selected.intersection(state["acl"].spaces) or (
             selected if state["acl"].admin else set()
         )
-        profile = classify_question(
-            state["query"], state.get("history", []), has_visible_space=bool(visible)
-        )
+        profile = classify_question(state["query"], has_visible_space=bool(visible))
         return {"profile": profile, "effective_query": profile.normalized_query}
+
+    async def _contextualize(
+        self, state: AgentGraphState, runtime: Runtime[WorkflowRuntimeContext]
+    ) -> dict[str, Any]:
+        _check_cancelled(runtime.context.cancelled)
+        if state["profile"].route == "refuse":
+            return {}
+        resolution = resolve_retrieval_query(state["query"], state.get("history", []))
+        if resolution.needs_clarification:
+            profile = QuestionProfile(
+                route="clarify",
+                use_graph=False,
+                normalized_query=resolution.effective_query,
+            )
+        else:
+            profile = classify_question(
+                resolution.effective_query,
+                has_visible_space=True,
+            )
+        return {
+            "effective_query": resolution.effective_query,
+            "contextualized": resolution.contextualized,
+            "profile": profile,
+        }
 
     async def _retrieve(
         self, state: AgentGraphState, runtime: Runtime[WorkflowRuntimeContext]
@@ -138,7 +163,14 @@ class AgentWorkflow:
             document_task, graph_task, runtime.context.cancelled
         )
         attempt = state.get("retrieval_attempt", 0) + 1
-        _emit("retrieval", summary=summary, attempt=attempt, query=query)
+        _emit(
+            "retrieval",
+            summary=summary,
+            attempt=attempt,
+            query=query,
+            original_query=state["query"],
+            contextualized=state.get("contextualized", False),
+        )
         return {
             "ranked_chunks": ranked,
             "graph_evidence": graph_evidence,
@@ -192,7 +224,7 @@ class AgentWorkflow:
         llm_enabled = any(policy.llm_enabled for policy in state["policies"])
         index_to_chunk: dict[str, RankedChunk] = {}
         if llm_enabled:
-            prompt, index_to_chunk = _build_prompt(state["effective_query"], context)
+            prompt, index_to_chunk = _build_prompt(state["query"], context)
             messages = state.get("history", []) + [ChatMessage(role="user", content=prompt)]
             parts: list[str] = []
             async for token in _stream_with_cancellation(self._chat.astream(messages), runtime.context.cancelled):

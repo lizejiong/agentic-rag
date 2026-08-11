@@ -19,6 +19,11 @@ describe('agent event fixture', () => {
     expect(events.at(-1)?.type).toBe('run.completed');
     expect(events.some((event) => event.type === 'retrieval.summary')).toBe(true);
     expect(events.some((event) => event.type === 'run.status' && event.status === 'understanding')).toBe(true);
+    const retrieval = events.find((event) => event.type === 'retrieval.summary');
+    expect(retrieval).toMatchObject({
+      type: 'retrieval.summary',
+      summary: { originalQuery: 'test', query: 'test', contextualized: false, attempt: 1 },
+    });
   });
 
   it('rejects unknown event fields', () => {

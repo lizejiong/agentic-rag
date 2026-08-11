@@ -29,7 +29,7 @@
 | 2 | 文档导入与生命周期 | 全格式上传、URL 单页、OCR/解析适配、版本、任务、删除恢复 | 1 | ✅ |
 | 3 | 混合检索与可验证问答 | pgvector + BM25 + RRF + Reranker、SSE 引用、反馈、短期记忆 | 2 | 🟡 核心完成，出口评测待补 |
 | 4 | 知识图谱治理 | Neo4j 候选图谱、证据绑定、审核发布、图谱浏览与多跳查询 | 3 | ⬜ |
-| 5 | Agent、长期记忆与评测 | LangGraph 路由、Mem0、Langfuse、评测中心、Deep Agents 实验 | 4 | 🟡 已启动真实模型适配 |
+| 5 | Agent、长期记忆与评测 | LangGraph 路由、Mem0、Langfuse、评测中心、Deep Agents 实验 | 4 | 🟡 LangGraph 主流程与评测中心已完成；长期记忆与可观测性待规划 |
 | 6 | 流式语音与生产加固 | ASR/TTS、WebSocket 播放、监控、备份恢复、安全和容量验收 | 5 | ⬜ |
 
 ## 3. 计划 0：仓库骨架与流协议
@@ -146,7 +146,7 @@
 
 ## 8. 计划 5：Agent、长期记忆与评测
 
-**当前进度：** 已接入 OpenAI 兼容的 Embedding 与 Chat 适配器，并提供真实模型连接检查；长期记忆、Langfuse、评测中心和 Deep Agents 仍未开始。
+**当前进度：** 已交付受限只读 LangGraph 主流程、图谱证据补充、基于 Redis 会话短期历史的上下文追问检索，以及评测中心。长期记忆、Langfuse、LangGraph Studio 和 Deep Agents 仍未开始，必须在单独方案中定义数据边界、用户控制和质量门槛。
 
 **范围：**
 

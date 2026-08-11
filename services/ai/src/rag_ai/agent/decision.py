@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from rag_ai.models.base import ChatMessage
+from rag_ai.agent.conversation import normalize_query
 
 
 Route = Literal["retrieve", "clarify", "refuse"]
@@ -26,8 +26,8 @@ RELATION_TERMS = (
     "depends on",
     "depends",
     "owner",
+    "负责",
 )
-ORPHAN_REFERENCES = ("它", "他", "她", "这", "那个", "上述", "前面", "这个", "that", "it", "they")
 
 
 @dataclass(frozen=True)
@@ -39,33 +39,16 @@ class QuestionProfile:
 
 def classify_question(
     query: str,
-    history: list[ChatMessage],
     *,
     has_visible_space: bool,
 ) -> QuestionProfile:
-    normalized = " ".join(query.split())
+    normalized = normalize_query(query)
     if not has_visible_space:
         return QuestionProfile(route="refuse", use_graph=False, normalized_query=normalized)
-    if _is_orphan_reference(normalized, history):
-        return QuestionProfile(route="clarify", use_graph=False, normalized_query=normalized)
 
     folded = normalized.casefold()
     return QuestionProfile(
         route="retrieve",
         use_graph=any(term in folded for term in RELATION_TERMS),
         normalized_query=normalized,
-    )
-
-
-def _is_orphan_reference(query: str, history: list[ChatMessage]) -> bool:
-    if history or not query:
-        return False
-    folded = query.casefold()
-    # A one/two-token question which begins with a reference has no resolvable
-    # antecedent.  Longer, self-contained questions such as “这个空间有哪些文档”
-    # should still retrieve normally.
-    compact = query.replace(" ", "")
-    return (
-        any(folded.startswith(term) for term in ORPHAN_REFERENCES)
-        and len(compact) <= 12
     )

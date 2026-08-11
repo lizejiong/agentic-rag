@@ -82,6 +82,47 @@ describe('AiStreamMapper', () => {
     ]);
   });
 
+  it('forwards every retrieval summary field to the UI message', () => {
+    const chunks: Chunk[] = [];
+    const mapper = new AiStreamMapper((chunk) => chunks.push(chunk));
+    mapper.write({
+      ...BASE,
+      type: 'retrieval.summary',
+      seq: 0,
+      summary: {
+        query: '采购申请由谁审批？\n追问：它是谁负责的？',
+        originalQuery: '它是谁负责的？',
+        contextualized: true,
+        attempt: 1,
+        vectorTopK: 50,
+        lexicalTopK: 50,
+        rrfK: 60,
+        rrfTopK: 30,
+        rerankTopK: 10,
+        rerankerEnabled: false,
+        paths: [],
+        rrfCandidateCount: 0,
+        finalCandidateCount: 0,
+        embeddingModel: 'mock',
+        embeddingVersion: 'v1',
+        rerankerModel: '',
+        rerankerVersion: '',
+        elapsedMs: 1,
+      },
+    });
+
+    expect(chunks).toContainEqual({
+      type: 'data-retrieval-summary',
+      id: `retrieval-${BASE.requestId}`,
+      data: expect.objectContaining({
+        originalQuery: '它是谁负责的？',
+        contextualized: true,
+        attempt: 1,
+      }),
+      transient: true,
+    });
+  });
+
   it('closes active text and emits an error terminal sequence', () => {
     const chunks: Chunk[] = [];
     const mapper = new AiStreamMapper((chunk) => chunks.push(chunk));

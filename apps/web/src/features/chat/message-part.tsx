@@ -49,7 +49,7 @@ function RetrievalSummaryCard({ part }: { part: Extract<RagMessagePart, { type: 
         <span className="flex items-center gap-1 text-slate-400">{(summary.elapsedMs / 1000).toFixed(1)}s <ChevronDown className="size-3" /></span>
       </summary>
       <div className="grid gap-2 border-t border-slate-200 px-3 py-3 text-xs leading-5">
-        <p><span className="text-slate-400">查询：</span>{summary.query}</p>
+        {summary.contextualized ? <><p><span className="text-slate-400">原问题：</span>{summary.originalQuery}</p><p><span className="text-slate-400">实际检索词：</span>{summary.query}</p></> : <p><span className="text-slate-400">查询：</span>{summary.query}</p>}
         <p><span className="text-slate-400">向量召回：</span>Top {summary.vectorTopK} · {summary.embeddingModel}@{summary.embeddingVersion}</p>
         <p><span className="text-slate-400">关键词召回：</span>Top {summary.lexicalTopK}</p>
         <p><span className="text-slate-400">融合结果：</span>Top {summary.rrfTopK}（{summary.rrfCandidateCount} 候选）</p>

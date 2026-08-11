@@ -53,6 +53,9 @@ describe('MessagePart', () => {
           type: 'data-retrieval-summary',
           data: {
             query: 'test query',
+            originalQuery: 'test query',
+            contextualized: false,
+            attempt: 1,
             vectorTopK: 50,
             lexicalTopK: 50,
             rrfK: 60,
@@ -87,6 +90,40 @@ describe('MessagePart', () => {
 
     expect(screen.getByText(/10 条证据/)).toBeInTheDocument();
     expect(screen.getByText(/mock-embedding/)).toBeInTheDocument();
+    expect(screen.getByText('test query')).toBeInTheDocument();
+  });
+
+  it('shows the original question beside a contextualized retrieval query', () => {
+    render(
+      <MessagePart
+        part={{
+          type: 'data-retrieval-summary',
+          data: {
+            query: '采购申请由谁审批？\n追问：它是谁负责的？',
+            originalQuery: '它是谁负责的？',
+            contextualized: true,
+            attempt: 1,
+            vectorTopK: 50,
+            lexicalTopK: 50,
+            rrfK: 60,
+            rrfTopK: 30,
+            rerankTopK: 10,
+            rerankerEnabled: false,
+            paths: [],
+            rrfCandidateCount: 0,
+            finalCandidateCount: 0,
+            embeddingModel: 'mock-embedding',
+            embeddingVersion: 'mock-1',
+            rerankerModel: '',
+            rerankerVersion: '',
+            elapsedMs: 250,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText('它是谁负责的？')).toBeInTheDocument();
+    expect(screen.getByText(/采购申请由谁审批？/)).toBeInTheDocument();
   });
 
   it('returns null for unknown data part types', () => {
