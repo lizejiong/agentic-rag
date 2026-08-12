@@ -3,6 +3,14 @@ import { z } from 'zod';
 import { requestJson } from '../../shared/api/request-json';
 import { visibleSpaceSchema, visibleSpacesSchema } from './space-contract';
 
+const updatedSpaceSchema = z.object({
+  id: z.uuid(),
+  embeddingEnabled: z.boolean(),
+  rerankerEnabled: z.boolean(),
+  llmEnabled: z.boolean(),
+  graphExtractionEnabled: z.boolean(),
+});
+
 export function listVisibleSpaces(fetcher: Fetcher, signal?: AbortSignal) {
   return requestJson({
     schema: visibleSpacesSchema,
@@ -31,7 +39,7 @@ export function updateSpace(
   input: { embeddingEnabled?: boolean; rerankerEnabled?: boolean; llmEnabled?: boolean; graphExtractionEnabled?: boolean },
 ) {
   return requestJson({
-    schema: visibleSpaceSchema,
+    schema: updatedSpaceSchema,
     input: `/api/spaces/${spaceId}`,
     fetcher,
     init: {
