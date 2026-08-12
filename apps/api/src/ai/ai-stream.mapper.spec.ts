@@ -111,16 +111,19 @@ describe('AiStreamMapper', () => {
       },
     });
 
-    expect(chunks).toContainEqual({
-      type: 'data-retrieval-summary',
-      id: `retrieval-${BASE.requestId}`,
-      data: expect.objectContaining({
-        originalQuery: '它是谁负责的？',
-        contextualized: true,
-        attempt: 1,
-      }),
-      transient: true,
-    });
+    const retrievalSummary = chunks.find(
+      (chunk): chunk is Extract<Chunk, { type: 'data-retrieval-summary' }> =>
+        chunk.type === 'data-retrieval-summary',
+    );
+
+    expect(retrievalSummary).toBeDefined();
+    if (!retrievalSummary) throw new Error('Expected a retrieval summary chunk');
+
+    expect(retrievalSummary.id).toBe(`retrieval-${BASE.requestId}`);
+    expect(retrievalSummary.data.originalQuery).toBe('它是谁负责的？');
+    expect(retrievalSummary.data.contextualized).toBe(true);
+    expect(retrievalSummary.data.attempt).toBe(1);
+    expect(retrievalSummary.transient).toBe(true);
   });
 
   it('closes active text and emits an error terminal sequence', () => {
