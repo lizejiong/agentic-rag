@@ -7,15 +7,16 @@ Python AI 服务以 LangGraph 1.2 的 `StateGraph` 执行只读问答流程。�
 ```text
 understand
   ├─ 无可见空间 ────────> refuse
-  ├─ 无上下文的指代 ────> clarify
-  └─ retrieve
+  └─ contextualize
+       ├─ 无上下文的短指代 ─> clarify
+       └─ classify -> retrieve
        └─ rank / build-context
             ├─ 证据充分 ─> answer
             ├─ 首次不足 ─> rewrite ─> retrieve
             └─ 仍然不足 ─> refuse
 ```
 
-关系类问题在 `retrieve` 节点同时执行文档混合检索和图谱查询；其他问题只执行文档检索。查询改写最多一次，图配置 `recursion_limit=12`，因此不会形成无界循环。
+`contextualize` 仅对短小的指代追问读取最近一条 user 历史消息；它将前序问题与本轮追问构造成 `effective_query`，供文档混合检索、图谱查询和证据重排使用。assistant 历史不作为检索锚点。无历史时仍澄清，不猜测实体。关系类问题在 `retrieve` 节点同时执行文档混合检索和图谱查询；其他问题只执行文档检索。查询改写最多一次，图配置 `recursion_limit=12`，因此不会形成无界循环。
 
 ## 证据规则
 
@@ -27,7 +28,7 @@ understand
 
 ## 流式与取消
 
-节点使用 LangGraph `custom` stream 发出内部 `status`、`retrieval`、`token`、`citation` 事件；`Agent` runner 是唯一的 NDJSON 映射器和 sequence 分配者。每次检索摘要都包含 `attempt` 与实际生效查询。
+节点使用 LangGraph `custom` stream 发出内部 `status`、`retrieval`、`token`、`citation` 事件；`Agent` runner 是唯一的 NDJSON 映射器和 sequence 分配者。每次检索摘要都包含 `attempt`、原问题 `originalQuery`、实际生效查询 `query` 与 `contextualized` 标记。回答 prompt 继续使用本轮原问题；历史只参与检索词构造，不能成为回答证据。
 
 检索及模型取词都会与请求的取消事件竞速。取消发生时，未完成任务被取消并等待回收；runner 只发送 `run.completed`（`finishReason=cancelled`），不会再泄露 token、citation 或失败事件。
 

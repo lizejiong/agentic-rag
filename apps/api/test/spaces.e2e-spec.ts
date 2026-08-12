@@ -227,6 +227,17 @@ describe('Organizations and knowledge spaces', () => {
       .set('authorization', `Bearer ${adminToken}`)
       .send({ status: 'ACTIVE' })
       .expect(200);
+    await request(server)
+      .delete(`/spaces/${createdSpace.id}`)
+      .set('authorization', `Bearer ${adminToken}`)
+      .expect(204);
+    const deletedSpaces = await request(server)
+      .get('/spaces')
+      .set('authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(visibleSpacesSchema.parse(deletedSpaces.body as unknown)).not.toContainEqual(
+      expect.objectContaining({ id: createdSpace.id }),
+    );
   });
 });
 

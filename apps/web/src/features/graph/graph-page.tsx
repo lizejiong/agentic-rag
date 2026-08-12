@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/auth-provider';
 import { useSpacesQuery } from '@/features/spaces/use-spaces-query';
+import { SpaceTabs } from '@/features/spaces/space-tabs';
 
 import {
   correctGraphRelation,
@@ -50,6 +51,7 @@ export function GraphPage() {
   if (!spaceId) return <Navigate replace to="/spaces" />;
   const allRelations = [...(published.data?.relations ?? []), ...(candidates.data?.relations ?? [])];
   return <div className="space-y-6">
+    <SpaceTabs canManage={Boolean(canManage)} spaceId={spaceId} spaceName={spaces.data?.find((space) => space.id === spaceId)?.name} />
     <p className="text-sm text-slate-500"><Link to={`/spaces/${spaceId}`} className="hover:text-blue-700">知识空间</Link> / 知识图谱</p>
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between gap-4"><div><p className="flex items-center gap-2 text-sm font-medium text-blue-700"><Network size={17} /> 可追溯证据的知识图谱</p><h1 className="mt-2 text-2xl font-semibold">已发布关系</h1><p className="mt-2 text-sm text-slate-500">每条展示的关系都关联当前可访问的原始文档证据。</p></div><Button variant="outline" onClick={() => { void published.refetch(); void candidates.refetch(); }}><RefreshCw size={15} />刷新</Button></div>

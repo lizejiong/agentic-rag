@@ -26,7 +26,7 @@ export class SpacePolicy {
   async listVisible(user: AuthenticatedUser) {
     const snapshot = await this.authorization.snapshot(user);
     const spaces = await this.prisma.knowledgeSpace.findMany({
-      where: { id: { in: Object.keys(snapshot.spaces) } },
+      where: { id: { in: Object.keys(snapshot.spaces) }, status: 'ACTIVE' },
       orderBy: { name: 'asc' },
       include: {
         _count: {

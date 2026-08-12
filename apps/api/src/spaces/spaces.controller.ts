@@ -108,6 +108,15 @@ export class SpacesController {
     return this.spaces.setStatus(user, id, parse(statusSchema, input).status);
   }
 
+  @Delete(':id')
+  @HttpCode(204)
+  delete(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    return this.spaces.delete(user, id);
+  }
+
   @Put(':id/grants')
   upsertGrant(
     @CurrentUser() user: AuthenticatedUser,
