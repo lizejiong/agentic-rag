@@ -82,6 +82,18 @@ describe('AiStreamMapper', () => {
     ]);
   });
 
+  it('writes a durable chat turn reference before the terminal chunk', () => {
+    const chunks: Chunk[] = [];
+    const mapper = new AiStreamMapper((chunk) => chunks.push(chunk));
+
+    mapper.write({ ...BASE, type: 'run.started', seq: 0 });
+    mapper.writeChatTurn('00000000-0000-4000-8000-000000000099');
+    mapper.write({ ...BASE, type: 'run.completed', seq: 1, finishReason: 'stop' });
+
+    expect(chunks).toContainEqual({ type: 'data-chat-turn', id: 'turn-00000000-0000-4000-8000-000000000099', data: { turnId: '00000000-0000-4000-8000-000000000099' } });
+    expect(chunks.at(-1)).toEqual({ type: 'finish', finishReason: 'stop' });
+  });
+
   it('forwards every retrieval summary field to the UI message', () => {
     const chunks: Chunk[] = [];
     const mapper = new AiStreamMapper((chunk) => chunks.push(chunk));
