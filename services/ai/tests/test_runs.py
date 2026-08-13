@@ -33,7 +33,10 @@ def _minimal_payload() -> dict:
 
 
 class FakeAgent:
+    last_history = None
+
     async def run(self, **kwargs):  # noqa: ANN003,ARG002
+        self.last_history = kwargs["history"]
         request_id = UUID(REQUEST_ID)
         cancelled = asyncio.Event()
         async for event in fake_agent_events(
@@ -52,7 +55,8 @@ class FakeAgent:
 
 
 def test_run_streams_ordered_ndjson_events() -> None:
-    runs_module._agent = FakeAgent()
+    agent = FakeAgent()
+    runs_module._agent = agent
     client = TestClient(app)
 
     with client.stream("POST", "/v1/agent/runs", json=_minimal_payload()) as response:
@@ -63,6 +67,26 @@ def test_run_streams_ordered_ndjson_events() -> None:
     assert events[0]["type"] == "run.started"
     assert events[-1] == {**events[-1], "type": "run.completed", "finishReason": "stop"}
     assert any(event["type"] == "citation" for event in events)
+
+
+def test_run_uses_only_history_received_from_api() -> None:
+    agent = FakeAgent()
+    runs_module._agent = agent
+    payload = _minimal_payload()
+    payload["history"] = [
+        {"role": "user", "content": "persisted question"},
+        {"role": "assistant", "content": "persisted answer"},
+    ]
+    client = TestClient(app)
+
+    response = client.post("/v1/agent/runs", json=payload)
+
+    assert response.status_code == 200
+    assert agent.last_history is not None
+    assert [(message.role, message.content) for message in agent.last_history] == [
+        ("user", "persisted question"),
+        ("assistant", "persisted answer"),
+    ]
 
 
 def test_cancel_is_idempotent() -> None:

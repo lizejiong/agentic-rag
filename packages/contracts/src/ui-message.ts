@@ -12,6 +12,7 @@ export type RagUIDataParts = {
   };
   'retrieval-summary': AgentRetrievalSummary;
   citation: Pick<AgentCitation, 'citationId' | 'chunkId' | 'documentId' | 'title' | 'snippet' | 'location'>;
+  'chat-turn': { turnId: string };
 };
 
 export type RagUIMessage = UIMessage<never, RagUIDataParts>;

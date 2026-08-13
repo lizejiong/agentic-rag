@@ -160,12 +160,15 @@ export class ConversationService {
           where: { id: input.conversationId },
           select: { title: true },
         });
-        if (conversation.title === DEFAULT_TITLE) {
-          await transaction.chatConversation.update({
-            where: { id: input.conversationId },
-            data: { title: titleFromQuestion(input.question) },
-          });
-        }
+        await transaction.chatConversation.update({
+          where: { id: input.conversationId },
+          data: {
+            updatedAt: new Date(),
+            ...(conversation.title === DEFAULT_TITLE
+              ? { title: titleFromQuestion(input.question) }
+              : {}),
+          },
+        });
         return turn;
       });
     } catch (error) {
@@ -181,6 +184,7 @@ export class ConversationService {
         status: 'COMPLETED', answer: output.answer,
         citations: output.citations as Prisma.InputJsonValue,
         errorCode: null, completedAt: new Date(),
+        conversation: { update: { data: { updatedAt: new Date() } } },
       },
     });
   }
@@ -188,7 +192,10 @@ export class ConversationService {
   failTurn(requestId: string, status: 'CANCELLED' | 'FAILED', errorCode: string) {
     return this.prisma.chatTurn.update({
       where: { requestId },
-      data: { status, errorCode, completedAt: new Date() },
+      data: {
+        status, errorCode, completedAt: new Date(),
+        conversation: { update: { data: { updatedAt: new Date() } } },
+      },
     });
   }
 
