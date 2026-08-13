@@ -36,14 +36,14 @@ describe('MessagePart', () => {
     expect(screen.getByText('流式答案')).toBeInTheDocument();
   });
 
-  it('renders an agent status badge', () => {
-    render(
+  it('does not render transient agent status inside persisted message parts', () => {
+    const { container } = render(
       <MessagePart
         part={{ type: 'data-agent-status', data: { status: 'retrieving', seq: 5 } }}
       />,
     );
 
-    expect(screen.getByText('检索资料')).toBeInTheDocument();
+    expect(container.innerHTML).toBe('');
   });
 
   it('renders a retrieval summary card', () => {

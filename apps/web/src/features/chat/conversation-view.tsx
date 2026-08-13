@@ -2,12 +2,26 @@ import { useEffect, useRef } from 'react';
 
 import type { RagUIMessage } from '@rag/contracts';
 
+import { AssistantActivity } from './assistant-activity';
 import { MessagePart } from './message-part';
 
-export function ConversationView({ messages }: { messages: RagUIMessage[] }) {
+function hasText(message: RagUIMessage) {
+  return message.parts.some((part) => part.type === 'text' && part.text.trim().length > 0);
+}
+
+export function ConversationView({
+  messages,
+  busy = false,
+  agentStatus,
+}: {
+  messages: RagUIMessage[];
+  busy?: boolean;
+  agentStatus?: string | undefined;
+}) {
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldFollowRef = useRef(true);
+  const latestAssistantIndex = messages.map((message) => message.role).lastIndexOf('assistant');
   useEffect(() => {
     const container = scrollRef.current;
     if (container && shouldFollowRef.current) container.scrollTo({ top: container.scrollHeight });
@@ -18,7 +32,7 @@ export function ConversationView({ messages }: { messages: RagUIMessage[] }) {
         {messages.length === 0 ? (
           <div className="flex min-h-0 flex-1 items-center justify-center py-20 text-center" />
         ) : (
-          messages.map((message) => (
+          messages.map((message, index) => (
             <article
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               key={message.id}
@@ -31,6 +45,9 @@ export function ConversationView({ messages }: { messages: RagUIMessage[] }) {
                     : 'w-full text-slate-700'
                 }`}
               >
+                {busy && index === latestAssistantIndex ? (
+                  <AssistantActivity status={agentStatus} compact={hasText(message)} />
+                ) : null}
                 {message.parts.map((part, index) => (
                   <MessagePart key={`${message.id}-${part.type}-${index}`} part={part} />
                 ))}
@@ -38,6 +55,13 @@ export function ConversationView({ messages }: { messages: RagUIMessage[] }) {
             </article>
           ))
         )}
+        {busy && latestAssistantIndex === -1 ? (
+          <article className="flex justify-start" data-role="assistant">
+            <div className="min-w-0 text-sm leading-7 text-slate-700">
+              <AssistantActivity status={agentStatus} compact={false} />
+            </div>
+          </article>
+        ) : null}
         <div ref={endRef} />
       </div>
     </div>

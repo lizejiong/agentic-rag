@@ -79,7 +79,7 @@ function ChatEngine({ auth, conversationId, initialMessages, spaces, spacesLoadi
   useEffect(() => { setMessages(initialMessages); }, [initialMessages, setMessages]);
   const displayedMessages = useThrottledMessages(messages);
   const busy = status === 'submitted' || status === 'streaming';
-  return <section className="flex min-w-0 flex-1 flex-col" aria-label="知识问答对话"><ConversationView messages={displayedMessages} />
-    <ChatComposer busy={busy} agentStatus={agentStatus} error={error} spaceError={spacesError ? '知识空间加载失败，请刷新页面后重试。' : undefined} spacesLoading={spacesLoading} hasSelectedSpaces={selectedSpaceIds.length > 0} onSend={(text) => { setAgentStatus(undefined); return sendMessage({ text }); }} onStop={stop} scopeControl={<SpaceScopeSelector spaces={spaces} selectedIds={selectedSpaceIds} loading={spacesLoading} onChange={setSelectedSpaceIds} />} />
+  return <section className="flex min-w-0 flex-1 flex-col" aria-label="知识问答对话"><ConversationView messages={displayedMessages} busy={busy} agentStatus={agentStatus} />
+    <ChatComposer busy={busy} error={error} spaceError={spacesError ? '知识空间加载失败，请刷新页面后重试。' : undefined} spacesLoading={spacesLoading} hasSelectedSpaces={selectedSpaceIds.length > 0} onSend={(text) => { setAgentStatus(undefined); return sendMessage({ text }); }} onStop={stop} scopeControl={<SpaceScopeSelector spaces={spaces} selectedIds={selectedSpaceIds} loading={spacesLoading} onChange={setSelectedSpaceIds} />} />
   </section>;
 }
