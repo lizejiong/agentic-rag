@@ -31,6 +31,5 @@ export function ConversationSidebar({
         </div>;
       })}
     </div>
-    <p className="mt-auto px-2 pb-1 text-xs leading-5 text-slate-500">内容仅来自你当前有访问权限的知识空间。</p>
   </aside>;
 }
