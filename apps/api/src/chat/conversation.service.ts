@@ -83,9 +83,13 @@ function citationsFrom(value: unknown): StoredCitation[] {
   return value.filter((item): item is StoredCitation => {
     if (!item || typeof item !== 'object') return false;
     const citation = item as Record<string, unknown>;
-    return ['chunkId', 'documentId', 'title', 'snippet'].every(
-      (key) => typeof citation[key] === 'string',
-    ) && typeof citation.location === 'object' && citation.location !== null;
+    return (
+      ['chunkId', 'documentId', 'title', 'snippet'].every(
+        (key) => typeof citation[key] === 'string',
+      ) &&
+      typeof citation.location === 'object' &&
+      citation.location !== null
+    );
   });
 }
 
@@ -110,14 +114,25 @@ export class ConversationService {
     });
   }
 
-  async getConversation(user: AuthenticatedUser, conversationId: string): Promise<ConversationDetail> {
+  async getConversation(
+    user: AuthenticatedUser,
+    conversationId: string,
+  ): Promise<ConversationDetail> {
     const conversation = await this.requireOwnedActiveConversation(user.id, conversationId);
     const turns = await this.prisma.chatTurn.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'asc' },
       select: {
-        id: true, requestId: true, question: true, scopeSpaceIds: true, status: true, answer: true,
-        citations: true, errorCode: true, completedAt: true, createdAt: true,
+        id: true,
+        requestId: true,
+        question: true,
+        scopeSpaceIds: true,
+        status: true,
+        answer: true,
+        citations: true,
+        errorCode: true,
+        completedAt: true,
+        createdAt: true,
       },
     });
     return {
@@ -181,9 +196,11 @@ export class ConversationService {
     return this.prisma.chatTurn.update({
       where: { requestId },
       data: {
-        status: 'COMPLETED', answer: output.answer,
+        status: 'COMPLETED',
+        answer: output.answer,
         citations: output.citations as Prisma.InputJsonValue,
-        errorCode: null, completedAt: new Date(),
+        errorCode: null,
+        completedAt: new Date(),
         conversation: { update: { data: { updatedAt: new Date() } } },
       },
     });
@@ -193,7 +210,9 @@ export class ConversationService {
     return this.prisma.chatTurn.update({
       where: { requestId },
       data: {
-        status, errorCode, completedAt: new Date(),
+        status,
+        errorCode,
+        completedAt: new Date(),
         conversation: { update: { data: { updatedAt: new Date() } } },
       },
     });
@@ -202,7 +221,10 @@ export class ConversationService {
   async historyForRun(user: AuthenticatedUser, conversationId: string): Promise<HistoryMessage[]> {
     const detail = await this.getConversation(user, conversationId);
     return detail.turns
-      .filter((turn): turn is VisibleTurn => turn.visibility === 'VISIBLE' && turn.status === 'COMPLETED' && Boolean(turn.answer))
+      .filter(
+        (turn): turn is VisibleTurn =>
+          turn.visibility === 'VISIBLE' && turn.status === 'COMPLETED' && Boolean(turn.answer),
+      )
       .slice(-10)
       .flatMap((turn) => [
         { role: 'user' as const, content: turn.question },
@@ -212,7 +234,8 @@ export class ConversationService {
 
   async getOwnedTurn(user: AuthenticatedUser, requestId: string) {
     const turn = await this.prisma.chatTurn.findUnique({
-      where: { requestId }, select: { id: true, conversation: { select: { ownerId: true, archivedAt: true } } },
+      where: { requestId },
+      select: { id: true, conversation: { select: { ownerId: true, archivedAt: true } } },
     });
     if (!turn || turn.conversation.ownerId !== user.id || turn.conversation.archivedAt) {
       throw new NotFoundException('CHAT_TURN_NOT_FOUND');
@@ -229,18 +252,40 @@ export class ConversationService {
     return conversation;
   }
 
-  private async visibleTurn(user: AuthenticatedUser, turn: StoredTurn): Promise<VisibleTurn | RedactedTurn> {
+  private async visibleTurn(
+    user: AuthenticatedUser,
+    turn: StoredTurn,
+  ): Promise<VisibleTurn | RedactedTurn> {
     try {
-      await Promise.all(turn.scopeSpaceIds.map((spaceId) => this.authorization.requireSpace(user, spaceId, 'VIEW')));
+      await Promise.all(
+        turn.scopeSpaceIds.map((spaceId) => this.authorization.requireSpace(user, spaceId, 'VIEW')),
+      );
       const citations = citationsFrom(turn.citations);
-      await Promise.all(citations.map((citation) => this.authorization.authorizeDocument(user, { documentId: citation.documentId, operation: 'CITATION' })));
+      await Promise.all(
+        citations.map((citation) =>
+          this.authorization.authorizeDocument(user, {
+            documentId: citation.documentId,
+            operation: 'CITATION',
+          }),
+        ),
+      );
       return { ...turn, visibility: 'VISIBLE', citations };
     } catch (error) {
-      if (!(error instanceof ForbiddenException) && !(error instanceof NotFoundException)) throw error;
+      if (!(error instanceof ForbiddenException) && !(error instanceof NotFoundException))
+        throw error;
       return {
-        id: turn.id, requestId: turn.requestId, visibility: 'REDACTED', question: null,
-        scopeSpaceIds: [], status: turn.status, answer: null, citations: [], errorCode: null,
-        completedAt: turn.completedAt, createdAt: turn.createdAt, message: REDACTED_MESSAGE,
+        id: turn.id,
+        requestId: turn.requestId,
+        visibility: 'REDACTED',
+        question: null,
+        scopeSpaceIds: [],
+        status: turn.status,
+        answer: null,
+        citations: [],
+        errorCode: null,
+        completedAt: turn.completedAt,
+        createdAt: turn.createdAt,
+        message: REDACTED_MESSAGE,
       };
     }
   }

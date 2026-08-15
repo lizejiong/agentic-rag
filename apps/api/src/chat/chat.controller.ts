@@ -110,13 +110,17 @@ export class ChatController {
               if (event.type === 'text.delta') answerParts.push(event.text);
               if (event.type === 'citation') {
                 citations.push({
-                  chunkId: event.chunkId, documentId: event.documentId, title: event.title,
-                  snippet: event.snippet, location: event.location,
+                  chunkId: event.chunkId,
+                  documentId: event.documentId,
+                  title: event.title,
+                  snippet: event.snippet,
+                  location: event.location,
                 });
               }
               if (event.type === 'run.completed' && event.finishReason === 'stop') {
                 const turn = await this.conversations.completeTurn(requestId, {
-                  answer: answerParts.join(''), citations,
+                  answer: answerParts.join(''),
+                  citations,
                 });
                 mapper.writeChatTurn(turn.id);
               } else if (event.type === 'run.completed') {
@@ -127,7 +131,11 @@ export class ChatController {
               mapper.write(event);
             }
           } catch (error) {
-            await this.conversations.failTurn(requestId, abort.signal.aborted ? 'CANCELLED' : 'FAILED', abort.signal.aborted ? 'CHAT_CANCELLED' : 'CHAT_STREAM_FAILED');
+            await this.conversations.failTurn(
+              requestId,
+              abort.signal.aborted ? 'CANCELLED' : 'FAILED',
+              abort.signal.aborted ? 'CHAT_CANCELLED' : 'CHAT_STREAM_FAILED',
+            );
             if (!abort.signal.aborted) {
               throw error;
             }
