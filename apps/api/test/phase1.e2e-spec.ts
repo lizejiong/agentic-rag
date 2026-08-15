@@ -104,6 +104,12 @@ describe('Phase 1 authenticated authorization chain', () => {
     const grantId = idSchema.parse(grantResponse.body as unknown).id;
     const member = await login(server, `${PREFIX}member`);
 
+    const conversationResponse = await request(server)
+      .post('/chat/conversations')
+      .set('authorization', `Bearer ${member.accessToken}`)
+      .expect(201);
+    const conversationId = idSchema.parse(conversationResponse.body as unknown).id;
+
     await request(server)
       .get('/spaces')
       .set('authorization', `Bearer ${member.accessToken}`)
@@ -121,16 +127,10 @@ describe('Phase 1 authenticated authorization chain', () => {
       .set('x-chat-protocol-version', '1')
       .set('x-trace-id', 'phase1-acceptance-trace')
       .send({
-        id: 'phase1-acceptance-conversation',
+        conversationId,
         requestId,
         selectedSpaceIds: [spaceId],
-        messages: [
-          {
-            id: 'phase1-acceptance-question',
-            role: 'user',
-            parts: [{ type: 'text', text: '验证真实身份链路' }],
-          },
-        ],
+        message: '验证真实身份链路',
       })
       .expect(200)
       .expect((response) => {
@@ -186,5 +186,9 @@ async function cleanup(prisma: PrismaService): Promise<void> {
     },
   });
   await prisma.outboxEvent.deleteMany({ where: { resourceId: { in: resourceIds } } });
+  await prisma.chatTurn.deleteMany({ where: { actorId: { in: users.map(({ id }) => id) } } });
+  await prisma.chatConversation.deleteMany({
+    where: { ownerId: { in: users.map(({ id }) => id) } },
+  });
   await prisma.user.deleteMany({ where: { id: { in: users.map(({ id }) => id) } } });
 }

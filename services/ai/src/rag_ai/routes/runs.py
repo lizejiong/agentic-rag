@@ -6,10 +6,9 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from rag_ai.agent.factory import build_agent, build_memory_store
+from rag_ai.agent.factory import build_agent
 from rag_ai.agent.runner import Agent
 from rag_ai.contracts.agent_events import ChatRequest
-from rag_ai.memory.session_memory import RedisSessionMemoryStore
 from rag_ai.models.base import ChatMessage
 from rag_ai.retrieval.models import AclSnapshot, SpacePolicy
 from rag_ai.runtime.registry import RunAlreadyActiveError, run_registry
@@ -20,7 +19,6 @@ router = APIRouter(prefix="/v1/agent/runs", tags=["agent-runs"])
 logger = logging.getLogger(__name__)
 
 _agent: Agent | None = None
-_memory_store: RedisSessionMemoryStore | None = None
 
 
 def _get_agent() -> Agent:
@@ -28,13 +26,6 @@ def _get_agent() -> Agent:
     if _agent is None:
         _agent = build_agent(get_worker_settings())
     return _agent
-
-
-def _get_memory_store() -> RedisSessionMemoryStore:
-    global _memory_store  # noqa: PLW0603
-    if _memory_store is None:
-        _memory_store = build_memory_store(get_worker_settings())
-    return _memory_store
 
 
 def _build_acl(snapshot: dict) -> AclSnapshot:
@@ -107,36 +98,14 @@ async def run_agent(request: ChatRequest) -> StreamingResponse:
     agent = _get_agent()
     acl = _build_acl(request.aclSnapshot)
     policies = await _load_space_policies(request.selectedSpaceIds, acl)
-    memory_store = _get_memory_store()
-
-    # Hydrate history from the request (recent turns from NestJS) and merge
-    # with persisted session memory when available.
-    request_history = [
+    # NestJS has already loaded only the currently authorized, persisted
+    # history for this conversation. Redis is not a second source of truth.
+    history = [
         ChatMessage(role=message.role, content=message.content)
         for message in request.history
     ]
-    session_memory = None
-    if request.sessionId:
-        try:
-            session_memory = await memory_store.load(UUID(request.actorId), request.sessionId)
-        except Exception:
-            # Memory is best-effort; do not fail the run.
-            session_memory = None
-
-    if session_memory and session_memory.messages:
-        # Deduplicate: request_history is the freshest, append older turns from
-        # persisted memory that aren't already in the request.
-        request_texts = {(message.role, message.content) for message in request_history}
-        merged = list(request_history)
-        for message in session_memory.messages:
-            if (message.role, message.content) not in request_texts:
-                merged.append(message)
-        history = merged
-    else:
-        history = request_history
 
     async def stream() -> AsyncIterator[bytes]:
-        answer_parts: list[str] = []
         try:
             async for event in agent.run(
                 request_id=request.requestId,
@@ -150,26 +119,11 @@ async def run_agent(request: ChatRequest) -> StreamingResponse:
                 cancelled=cancellation_event,
             ):
                 yield encode_ndjson(event)
-                if event.type == "text.delta":
-                    answer_parts.append(event.text)
         except Exception:
             logger.exception("AI run failed", extra={"request_id": str(request.requestId)})
             raise
         finally:
             run_registry.release(request.requestId, cancellation_event)
-            # Persist this turn to session memory (best-effort).
-            if request.sessionId and answer_parts:
-                try:
-                    answer_text = "".join(answer_parts)
-                    await memory_store.append_turn(
-                        user_id=UUID(request.actorId),
-                        session_id=request.sessionId,
-                        user_message=request.question,
-                        assistant_message=answer_text,
-                    )
-                except Exception:
-                    # Memory persistence failure must not break the HTTP response.
-                    pass
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 

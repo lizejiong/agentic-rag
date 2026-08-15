@@ -83,6 +83,11 @@ export class AiStreamMapper {
     }
   }
 
+  writeChatTurn(turnId: string): void {
+    if (this.terminal) throw new Error('Cannot write a chat turn after a terminal event');
+    this.writeChunk({ type: 'data-chat-turn', id: `turn-${turnId}`, data: { turnId } });
+  }
+
   private closeText(): void {
     if (this.textStarted) {
       this.writeChunk({ type: 'text-end', id: 'answer' });

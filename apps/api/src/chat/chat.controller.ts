@@ -12,7 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { RagUIMessage } from '@rag/contracts';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 
 import { AI_EVENT_SOURCE, type AiEventSource } from '../ai/ai-event-source';
 import { AiStreamMapper } from '../ai/ai-stream.mapper';
@@ -22,64 +22,8 @@ import { AuthorizationService } from '../authorization/authorization.service';
 import type { AuthorizationSnapshot } from '../authorization/authorization.types';
 import { ActiveRunRegistry } from './active-run.registry';
 import { ChatProtocolGuard } from './chat-protocol.guard';
-import { chatRequestSchema, type ChatRequest } from './chat.request';
-
-function extractQuestion(messages: ChatRequest['messages']): string {
-  const lastUser = [...messages].reverse().find((message) => message.role === 'user');
-  if (!lastUser) {
-    return '';
-  }
-
-  return lastUser.parts
-    .filter(
-      (part): part is { type: 'text'; text: string } =>
-        typeof part === 'object' &&
-        part !== null &&
-        'type' in part &&
-        part.type === 'text' &&
-        'text' in part &&
-        typeof part.text === 'string',
-    )
-    .map((part) => part.text)
-    .join('')
-    .trim();
-}
-
-function extractHistory(
-  messages: ChatRequest['messages'],
-  snapshot: AuthorizationSnapshot,
-): Array<{ role: 'user' | 'assistant'; content: string }> {
-  const history: Array<{ role: 'user' | 'assistant'; content: string }> = [];
-  for (const message of messages) {
-    if (message.role !== 'user' && message.role !== 'assistant') {
-      continue;
-    }
-    const text = message.parts
-      .filter(
-        (part): part is { type: 'text'; text: string } =>
-          typeof part === 'object' &&
-          part !== null &&
-          'type' in part &&
-          part.type === 'text' &&
-          'text' in part &&
-          typeof part.text === 'string',
-      )
-      .map((part) => part.text)
-      .join('')
-      .trim();
-    if (!text) {
-      continue;
-    }
-    history.push({ role: message.role, content: text });
-  }
-  // Exclude the last user message that is the current question.
-  const last = history.at(-1);
-  if (last?.role === 'user') {
-    history.pop();
-  }
-  // Truncate to the most recent turns to stay within context budgets.
-  return history.slice(-(snapshot.spaces ? 10 : 6));
-}
+import { chatRequestSchema } from './chat.request';
+import { ConversationService, type StoredCitation } from './conversation.service';
 
 function buildAclSnapshot(snapshot: AuthorizationSnapshot): Record<string, unknown> {
   return {
@@ -97,6 +41,7 @@ export class ChatController {
     @Inject(AI_EVENT_SOURCE) private readonly ai: AiEventSource,
     private readonly activeRuns: ActiveRunRegistry,
     private readonly authorization: AuthorizationService,
+    private readonly conversations: ConversationService,
   ) {}
 
   @Post('stream')
@@ -105,11 +50,6 @@ export class ChatController {
     const parsed = chatRequestSchema.safeParse(req.body);
     if (!parsed.success) {
       throw new BadRequestException('INVALID_CHAT_REQUEST');
-    }
-
-    const question = extractQuestion(parsed.data.messages);
-    if (!question) {
-      throw new BadRequestException('USER_QUESTION_REQUIRED');
     }
 
     const requestId = parsed.data.requestId;
@@ -128,7 +68,16 @@ export class ChatController {
             revision: 0n,
             spaces: {},
           } as AuthorizationSnapshot);
-    const history = extractHistory(parsed.data.messages, snapshot);
+    const traceId = req.header('x-trace-id')?.trim() || randomUUID();
+    await this.conversations.startTurn({
+      conversationId: parsed.data.conversationId,
+      requestId,
+      actorId: req.user.id,
+      question: parsed.data.message,
+      scopeSpaceIds: parsed.data.selectedSpaceIds,
+      traceId,
+    });
+    const history = await this.conversations.historyForRun(req.user, parsed.data.conversationId);
     const abort = this.activeRuns.start(requestId, req.user.id);
     req.once('aborted', () => abort.abort());
     res.once('close', () => {
@@ -142,23 +91,51 @@ export class ChatController {
       const stream = createUIMessageStream<RagUIMessage>({
         execute: async ({ writer }) => {
           const mapper = new AiStreamMapper((chunk) => writer.write(chunk));
+          const answerParts: string[] = [];
+          const citations: StoredCitation[] = [];
           try {
             for await (const event of this.ai.run(
               {
                 requestId,
-                traceId: req.header('x-trace-id')?.trim() || randomUUID(),
+                traceId,
                 actorId: req.user.id,
-                question,
+                question: parsed.data.message,
                 selectedSpaceIds: parsed.data.selectedSpaceIds,
                 aclSnapshot: buildAclSnapshot(snapshot),
-                sessionId: parsed.data.id,
+                sessionId: parsed.data.conversationId,
                 history,
               },
               abort.signal,
             )) {
+              if (event.type === 'text.delta') answerParts.push(event.text);
+              if (event.type === 'citation') {
+                citations.push({
+                  chunkId: event.chunkId,
+                  documentId: event.documentId,
+                  title: event.title,
+                  snippet: event.snippet,
+                  location: event.location,
+                });
+              }
+              if (event.type === 'run.completed' && event.finishReason === 'stop') {
+                const turn = await this.conversations.completeTurn(requestId, {
+                  answer: answerParts.join(''),
+                  citations,
+                });
+                mapper.writeChatTurn(turn.id);
+              } else if (event.type === 'run.completed') {
+                await this.conversations.failTurn(requestId, 'CANCELLED', 'CHAT_CANCELLED');
+              } else if (event.type === 'run.failed') {
+                await this.conversations.failTurn(requestId, 'FAILED', event.code);
+              }
               mapper.write(event);
             }
           } catch (error) {
+            await this.conversations.failTurn(
+              requestId,
+              abort.signal.aborted ? 'CANCELLED' : 'FAILED',
+              abort.signal.aborted ? 'CHAT_CANCELLED' : 'CHAT_STREAM_FAILED',
+            );
             if (!abort.signal.aborted) {
               throw error;
             }
@@ -182,6 +159,7 @@ export class ChatController {
     @Req() request: AuthenticatedRequest,
     @Param('requestId', new ParseUUIDPipe()) requestId: string,
   ): Promise<{ status: 'cancelling' }> {
+    await this.conversations.getOwnedTurn(request.user, requestId);
     if (this.activeRuns.abort(requestId, request.user.id)) {
       await this.ai.cancel(requestId);
     }

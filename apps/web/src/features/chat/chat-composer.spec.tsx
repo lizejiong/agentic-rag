@@ -10,7 +10,6 @@ function renderComposer(options?: { hasSelectedSpaces?: boolean }) {
   render(
     <ChatComposer
       busy={false}
-      agentStatus={undefined}
       error={undefined}
       spaceError={undefined}
       spacesLoading={false}

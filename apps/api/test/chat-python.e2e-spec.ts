@@ -10,12 +10,18 @@ import { AI_EVENT_SOURCE, type AiEventSource } from '../src/ai/ai-event-source';
 import { AppModule } from '../src/app.module';
 import { AccessTokenGuard } from '../src/auth/access-token.guard';
 import type { AuthenticatedRequest } from '../src/auth/current-user.decorator';
+import { AuthorizationService } from '../src/authorization/authorization.service';
+import { ConversationService } from '../src/chat/conversation.service';
 
 const REQUEST_ID = '00000000-0000-4000-8000-000000000030';
+const CONVERSATION_ID = '00000000-0000-4000-8000-000000000031';
+const TURN_ID = '00000000-0000-4000-8000-000000000032';
+const SPACE_ID = '00000000-0000-4000-8000-000000000033';
+const USER_ID = '00000000-0000-4000-8000-000000000001';
 const testAuthGuard = {
   canActivate(context: ExecutionContext): boolean {
     context.switchToHttp().getRequest<AuthenticatedRequest>().user = {
-      id: '00000000-0000-4000-8000-000000000001',
+      id: USER_ID,
       username: 'tester',
       role: 'MEMBER',
       tokenVersion: 0,
@@ -26,16 +32,10 @@ const testAuthGuard = {
 
 function payload(requestId = REQUEST_ID) {
   return {
-    id: 'e2e-conversation',
+    conversationId: CONVERSATION_ID,
     requestId,
-    selectedSpaceIds: [],
-    messages: [
-      {
-        id: 'e2e-user',
-        role: 'user',
-        parts: [{ type: 'text', text: '验证取消传播' }],
-      },
-    ],
+    selectedSpaceIds: [SPACE_ID],
+    message: '验证取消传播',
   };
 }
 
@@ -106,6 +106,21 @@ class ObservableAiEventSource implements AiEventSource {
   }
 }
 
+async function waitForStreamStart(
+  fake: ObservableAiEventSource,
+  response: Promise<{ status: number; text: string }>,
+): Promise<void> {
+  const outcome = await Promise.race([
+    fake.waitUntilStarted().then(() => ({ started: true as const })),
+    response.then((result) => ({ started: false as const, result })),
+  ]);
+  if (!outcome.started) {
+    throw new Error(
+      `Expected the AI stream to start, received ${outcome.result.status}: ${outcome.result.text}`,
+    );
+  }
+}
+
 describe('Chat cancellation boundaries', () => {
   let app: INestApplication;
   let fake: ObservableAiEventSource;
@@ -117,6 +132,25 @@ describe('Chat cancellation boundaries', () => {
     })
       .overrideProvider(AI_EVENT_SOURCE)
       .useValue(fake)
+      .overrideProvider(ConversationService)
+      .useValue({
+        startTurn: jest.fn().mockResolvedValue({ id: TURN_ID }),
+        historyForRun: jest.fn().mockResolvedValue([]),
+        completeTurn: jest.fn().mockResolvedValue({ id: TURN_ID }),
+        failTurn: jest.fn().mockResolvedValue(undefined),
+        getOwnedTurn: jest.fn().mockResolvedValue({ id: TURN_ID }),
+      })
+      .overrideProvider(AuthorizationService)
+      .useValue({
+        requireSpace: jest.fn().mockResolvedValue('VIEW'),
+        snapshot: jest.fn().mockResolvedValue({
+          userId: USER_ID,
+          admin: false,
+          groupIds: [],
+          revision: 0n,
+          spaces: { [SPACE_ID]: 'VIEW' },
+        }),
+      })
       .overrideGuard(AccessTokenGuard)
       .useValue(testAuthGuard)
       .compile();
@@ -149,7 +183,7 @@ describe('Chat cancellation boundaries', () => {
       .set('x-chat-protocol-version', '1')
       .send(payload())
       .then((response) => response);
-    await fake.waitUntilStarted();
+    await waitForStreamStart(fake, streamResponse);
 
     await request(app.getHttpServer() as Server)
       .post(`/chat/${REQUEST_ID}/cancel`)

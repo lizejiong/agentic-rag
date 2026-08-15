@@ -128,6 +128,15 @@ enum EvaluationRunStatus {
   @@schema("app")
 }
 
+enum ChatTurnStatus {
+  RUNNING
+  COMPLETED
+  CANCELLED
+  FAILED
+
+  @@schema("app")
+}
+
 model User {
   id               String            @id @default(uuid()) @db.Uuid
   username         String            @unique @db.VarChar(80)
@@ -149,11 +158,52 @@ model User {
   createdImports   ImportTask[]      @relation("ImportTaskCreator")
   evaluationDatasets EvaluationDataset[] @relation("EvaluationDatasetCreator")
   evaluationRuns     EvaluationRun[]     @relation("EvaluationRunCreator")
+  chatConversations  ChatConversation[]  @relation("ChatConversationOwner")
+  chatTurns          ChatTurn[]          @relation("ChatTurnActor")
   refreshSessions  RefreshSession[]
 
   @@index([departmentId])
   @@index([status])
   @@map("users")
+  @@schema("app")
+}
+
+model ChatConversation {
+  id         String     @id @default(uuid()) @db.Uuid
+  ownerId    String     @map("owner_id") @db.Uuid
+  title      String     @default("新会话") @db.VarChar(120)
+  archivedAt DateTime?  @map("archived_at") @db.Timestamptz(3)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner      User       @relation("ChatConversationOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  turns      ChatTurn[]
+
+  @@index([ownerId, archivedAt, updatedAt])
+  @@map("chat_conversations")
+  @@schema("app")
+}
+
+model ChatTurn {
+  id             String           @id @default(uuid()) @db.Uuid
+  conversationId String           @map("conversation_id") @db.Uuid
+  requestId      String           @unique @map("request_id") @db.Uuid
+  actorId        String           @map("actor_id") @db.Uuid
+  traceId        String           @map("trace_id") @db.VarChar(120)
+  question       String
+  scopeSpaceIds  String[]         @map("scope_space_ids") @db.Uuid
+  status         ChatTurnStatus   @default(RUNNING)
+  answer         String?
+  citations      Json             @default("[]")
+  errorCode      String?          @map("error_code") @db.VarChar(120)
+  completedAt    DateTime?        @map("completed_at") @db.Timestamptz(3)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  actor          User             @relation("ChatTurnActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([conversationId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([scopeSpaceIds], type: Gin)
+  @@map("chat_turns")
   @@schema("app")
 }
 

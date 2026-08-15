@@ -6,14 +6,6 @@ import type { RagUIMessage } from '@rag/contracts';
 
 type RagMessagePart = RagUIMessage['parts'][number];
 
-const STATUS_LABELS: Record<string, string> = {
-  understanding: '理解问题',
-  retrieving: '检索资料',
-  ranking: '排序证据',
-  answering: '生成回答',
-  cancelled: '已取消',
-};
-
 function formatLocation(location: {
   page?: number | undefined;
   slide?: number | undefined;
@@ -24,15 +16,6 @@ function formatLocation(location: {
   if (location.slide) return `第 ${location.slide} 页幻灯片`;
   if (location.sheet) return location.cellRange ? `${location.sheet} · ${location.cellRange}` : location.sheet;
   return undefined;
-}
-
-function StatusBadge({ part }: { part: Extract<RagMessagePart, { type: 'data-agent-status' }> }) {
-  return (
-    <span className="my-1 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs text-blue-700" aria-live="polite">
-      <span className="size-1.5 animate-pulse rounded-full bg-blue-600" aria-hidden="true" />
-      {STATUS_LABELS[part.data.status] ?? part.data.status}
-    </span>
-  );
 }
 
 function RetrievalSummaryCard({ part }: { part: Extract<RagMessagePart, { type: 'data-retrieval-summary' }> }) {
@@ -62,7 +45,7 @@ function RetrievalSummaryCard({ part }: { part: Extract<RagMessagePart, { type: 
 export function MessagePart({ part }: { part: RagMessagePart }) {
   const [expanded, setExpanded] = useState(false);
   if (part.type === 'text') return <p className="whitespace-pre-wrap">{part.text}</p>;
-  if (part.type === 'data-agent-status') return <StatusBadge part={part} />;
+  if (part.type === 'data-agent-status') return null;
   if (part.type === 'data-retrieval-summary') return <RetrievalSummaryCard part={part} />;
   if (part.type !== 'data-citation') return null;
 

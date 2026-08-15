@@ -4,17 +4,8 @@ import { Send, Square } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
-const STATUS_LABELS: Record<string, string> = {
-  understanding: '正在理解问题',
-  retrieving: '正在检索知识库',
-  ranking: '正在重排证据',
-  answering: '正在组织答案',
-  cancelled: '已停止生成',
-};
-
 export function ChatComposer({
   busy,
-  agentStatus,
   error,
   spaceError,
   spacesLoading,
@@ -24,7 +15,6 @@ export function ChatComposer({
   scopeControl,
 }: {
   busy: boolean;
-  agentStatus: string | undefined;
   error: Error | undefined;
   spaceError: string | undefined;
   spacesLoading: boolean;
@@ -44,14 +34,6 @@ export function ChatComposer({
   return (
     <div className="shrink-0 bg-transparent px-8 pb-6 pt-3">
       <div className="mx-auto w-full max-w-4xl">
-        <div className="mb-2 flex min-h-4 items-center gap-2 px-1 text-xs text-slate-500" aria-live="polite">
-          {busy ? <span className="size-1.5 animate-pulse rounded-full bg-blue-600" aria-hidden="true" /> : null}
-          {agentStatus
-            ? STATUS_LABELS[agentStatus] ?? agentStatus
-            : busy
-              ? '正在连接知识服务'
-              : null}
-        </div>
         {error ? <p className="mb-2 text-sm text-red-600" role="alert">服务连接已中断，请确认 API 服务后重试。</p> : null}
         {spaceError ? <p className="mb-2 text-sm text-red-600" role="alert">{spaceError}</p> : null}
         {!spacesLoading && !hasSelectedSpaces ? (
