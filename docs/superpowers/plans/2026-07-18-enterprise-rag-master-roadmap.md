@@ -27,9 +27,9 @@
 | 0 | 仓库骨架与流协议 | React → NestJS → Python 的可取消假流式问答，CI 通过 | 无 | ✅ |
 | 1 | 本地数据平台与身份权限 | Docker Compose 数据层、本地账号、两角色、空间 ACL、审计 | 0 | ✅ |
 | 2 | 文档导入与生命周期 | 全格式上传、URL 单页、OCR/解析适配、版本、任务、删除恢复 | 1 | ✅ |
-| 3 | 混合检索与可验证问答 | pgvector + BM25 + RRF + Reranker、SSE 引用、反馈、短期记忆 | 2 | 🟡 核心完成，出口评测待补 |
+| 3 | 混合检索与可验证问答 | pgvector + BM25 + RRF + Reranker、SSE 引用、反馈 | 2 | 🟡 核心完成，出口评测待补 |
 | 4 | 知识图谱治理 | Neo4j 候选图谱、证据绑定、审核发布、图谱浏览与多跳查询 | 3 | ⬜ |
-| 5 | Agent、长期记忆与评测 | LangGraph 路由、Mem0、Langfuse、评测中心、Deep Agents 实验 | 4 | 🟡 LangGraph 主流程与评测中心已完成；长期记忆与可观测性待规划 |
+| 5 | Agent、长期记忆与评测 | LangGraph 路由、最小会话级长期上下文、Mem0、Langfuse、评测中心、Deep Agents 实验 | 4 | 🟡 LangGraph 主流程、评测中心与最小会话级长期上下文已交付；Mem0 等其他长期记忆与可观测性待规划 |
 | 6 | 流式语音与生产加固 | ASR/TTS、WebSocket 播放、监控、备份恢复、安全和容量验收 | 5 | ⬜ |
 
 ## 3. 计划 0：仓库骨架与流协议
@@ -114,7 +114,7 @@
 - 默认 LangGraph 简单路由、证据充分性、最多一次查询重写。
 - AI SDK `data-agent-status`、`data-retrieval-summary` 和 `data-citation`。
 - `citation_id` 打开时由 NestJS 按最新 ACL 重新鉴权。
-- Redis 滑动窗口、会话摘要和问答反馈。
+- 问答反馈；会话上下文由后续计划 5 的 PostgreSQL 聊天轮次动态构建，不使用 Redis 会话记忆。
 
 **状态：** 🟡 核心管线已完成；2026-07-26 已通过 OpenAI 兼容真实模型的上传、索引、检索、引用与问答端到端冒烟，以及 Python `ruff`、`mypy`、`pytest`。仍待补齐定量评测门槛。
 
@@ -146,7 +146,7 @@
 
 ## 8. 计划 5：Agent、长期记忆与评测
 
-**当前进度：** 已交付受限只读 LangGraph 主流程、图谱证据补充、基于 Redis 会话短期历史的上下文追问检索，以及评测中心。长期记忆、Langfuse、LangGraph Studio 和 Deep Agents 仍未开始，必须在单独方案中定义数据边界、用户控制和质量门槛。
+**当前进度：** 已交付受限只读 LangGraph 主流程、图谱证据补充、评测中心，以及最小会话级长期上下文：PostgreSQL 聊天轮次是唯一事实来源；每个请求按最新 ACL 重新过滤；最近 6 个可见完成问答原文与更早可见轮次的用户问题动态摘要仅用于短追问的检索查询改写。摘要不落库，也不由模型生成；回答模型只接收当前问题与本轮检索/图谱证据，权限或文档撤销后旧轮不再复用。Redis 仍用于任务流和基础设施，不用于会话记忆。此项交付不代表所有长期记忆已完成：Mem0、跨会话或跨用户画像、记忆管理 UI、Langfuse、LangGraph Studio 和 Deep Agents 仍未开始，必须在单独方案中定义数据边界、用户控制和质量门槛。
 
 **范围：**
 
@@ -288,7 +288,7 @@
 | ✅ 已完成 | 知识库 CRUD + 隔离、文档上传（11 种格式+校验+去重）、处理状态机、文档列表基本列、文档详情（文件信息+解析文本+下载+版本历史）、失败原因展示、**混合检索全管线**（pgvector+ES+RRF+Reranker+Agent+引用+embedding+ES 索引）、软删除服务层 |
 | 🟡 Phase 2 收尾 | 删除 Controller 端点+级联清理、列表搜索筛选、上传人显示、文件替换、失败重试、空间统计 |
 | 🟡 Phase 3 收尾 | 退出检查、检索测试台、Chunk 可视化、重新索引、Chunk 设置 UI |
-| ⬜ 计划 4-6 | 知识图谱、真实模型接入、长期记忆、评测、语音、生产加固 |
+| ⬜ 计划 4-6 | 尚未开始的 Mem0、跨会话或跨用户画像、记忆管理 UI、Langfuse、LangGraph Studio、Deep Agents、语音、生产加固 |
 
 > **注：**「🟡 Phase 3 收尾」的项目检索核心管线（混合检索、Agent、引用、嵌入索引）已经用 mock 模型跑通，剩余主要是用户可见的调试/可视化工具和退出评测。真实 LLM/Embedding/Reranker 模型接入（OpenAI、Cohere 等）属于计划 5。
 
