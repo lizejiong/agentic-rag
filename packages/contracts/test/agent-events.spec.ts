@@ -2,7 +2,19 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { agentEventSchema } from '../src/agent-events';
+import { agentEventSchema, chatRequestSchema } from '../src/agent-events';
+
+const runRequest = {
+  requestId: '00000000-0000-4000-8000-000000000001',
+  traceId: 'trace-fixture',
+  actorId: 'actor-fixture',
+  question: 'test question',
+  selectedSpaceIds: [],
+};
+
+function canonicalHistorySummary(topics: string[]): string {
+  return `此前已授权的用户话题：\n${topics.map((topic) => `- ${topic}`).join('\n')}`;
+}
 
 describe('agent event fixture', () => {
   it('accepts the canonical ordered event sequence', () => {
@@ -37,5 +49,50 @@ describe('agent event fixture', () => {
         unexpected: true,
       }),
     ).toThrow();
+  });
+
+  it('defaults history summary and accepts 4000 Unicode code points', () => {
+    expect(chatRequestSchema.parse(runRequest).historySummary).toBe('');
+    const summary = '😀'.repeat(4000);
+    expect(chatRequestSchema.parse({ ...runRequest, historySummary: summary }).historySummary).toBe(
+      summary,
+    );
+  });
+
+  it('rejects history summaries over 4000 Unicode code points and unknown fields', () => {
+    expect(() =>
+      chatRequestSchema.parse({ ...runRequest, historySummary: '😀'.repeat(4001) }),
+    ).toThrow();
+    expect(() => chatRequestSchema.parse({ ...runRequest, unexpected: true })).toThrow();
+  });
+
+  it('bounds canonical history summaries without changing noncanonical compatibility', () => {
+    expect(() =>
+      chatRequestSchema.parse({
+        ...runRequest,
+        historySummary: canonicalHistorySummary(Array.from({ length: 20 }, () => 'topic')),
+      }),
+    ).not.toThrow();
+    expect(() =>
+      chatRequestSchema.parse({
+        ...runRequest,
+        historySummary: canonicalHistorySummary(Array.from({ length: 21 }, () => 'topic')),
+      }),
+    ).toThrow();
+    expect(() =>
+      chatRequestSchema.parse({
+        ...runRequest,
+        historySummary: canonicalHistorySummary(['😀'.repeat(240)]),
+      }),
+    ).not.toThrow();
+    expect(() =>
+      chatRequestSchema.parse({
+        ...runRequest,
+        historySummary: canonicalHistorySummary(['😀'.repeat(241)]),
+      }),
+    ).toThrow();
+    expect(() =>
+      chatRequestSchema.parse({ ...runRequest, historySummary: 'legacy noncanonical summary' }),
+    ).not.toThrow();
   });
 });

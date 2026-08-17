@@ -12,6 +12,7 @@ const REQUEST: RunRequestInput = {
   aclSnapshot: {},
   sessionId: undefined,
   history: [],
+  historySummary: '',
 };
 
 function event(seq: number): AgentEvent {

@@ -128,7 +128,9 @@ class AgentWorkflow:
         _check_cancelled(runtime.context.cancelled)
         if state["profile"].route == "refuse":
             return {}
-        resolution = resolve_retrieval_query(state["query"], state.get("history", []))
+        resolution = resolve_retrieval_query(
+            state["query"], state.get("history", []), state.get("history_summary", "")
+        )
         if resolution.needs_clarification:
             profile = QuestionProfile(
                 route="clarify",
@@ -225,7 +227,7 @@ class AgentWorkflow:
         index_to_chunk: dict[str, RankedChunk] = {}
         if llm_enabled:
             prompt, index_to_chunk = _build_prompt(state["query"], context)
-            messages = state.get("history", []) + [ChatMessage(role="user", content=prompt)]
+            messages = [ChatMessage(role="user", content=prompt)]
             parts: list[str] = []
             async for token in _stream_with_cancellation(self._chat.astream(messages), runtime.context.cancelled):
                 parts.append(token)

@@ -77,7 +77,7 @@ export class ChatController {
       scopeSpaceIds: parsed.data.selectedSpaceIds,
       traceId,
     });
-    const history = await this.conversations.historyForRun(req.user, parsed.data.conversationId);
+    const context = await this.conversations.contextForRun(req.user, parsed.data.conversationId);
     const abort = this.activeRuns.start(requestId, req.user.id);
     req.once('aborted', () => abort.abort());
     res.once('close', () => {
@@ -103,7 +103,8 @@ export class ChatController {
                 selectedSpaceIds: parsed.data.selectedSpaceIds,
                 aclSnapshot: buildAclSnapshot(snapshot),
                 sessionId: parsed.data.conversationId,
-                history,
+                history: context.history,
+                historySummary: context.historySummary,
               },
               abort.signal,
             )) {

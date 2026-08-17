@@ -12,6 +12,11 @@ import { PrismaService } from '../infrastructure/database/prisma.service';
 
 const DEFAULT_TITLE = '新会话';
 const REDACTED_MESSAGE = '该轮记录因权限或文档状态变化不可显示';
+const RECENT_HISTORY_TURN_LIMIT = 6;
+const SUMMARY_QUESTION_LIMIT = 20;
+const SUMMARY_QUESTION_CHARACTER_LIMIT = 240;
+const HISTORY_SUMMARY_CHARACTER_LIMIT = 4_000;
+const HISTORY_SUMMARY_PREFIX = '此前已授权的用户话题：';
 
 export type StoredCitation = {
   chunkId: string;
@@ -21,7 +26,14 @@ export type StoredCitation = {
   location: Record<string, unknown>;
 };
 
-type HistoryMessage = { role: 'user' | 'assistant'; content: string };
+export type HistoryMessage = { role: 'user' | 'assistant'; content: string };
+
+export type RunContext = {
+  history: HistoryMessage[];
+  historySummary: string;
+};
+
+export type ConversationRunContext = RunContext;
 
 type StoredTurn = {
   id: string;
@@ -91,6 +103,30 @@ function citationsFrom(value: unknown): StoredCitation[] {
       citation.location !== null
     );
   });
+}
+
+function characterLength(value: string): number {
+  return Array.from(value).length;
+}
+
+function truncateCharacters(value: string, limit: number): string {
+  return Array.from(value).slice(0, limit).join('');
+}
+
+function historySummary(turns: VisibleTurn[]): string {
+  if (turns.length === 0) return '';
+
+  let summary = HISTORY_SUMMARY_PREFIX;
+  for (const turn of turns.slice(-SUMMARY_QUESTION_LIMIT)) {
+    const remaining = HISTORY_SUMMARY_CHARACTER_LIMIT - characterLength(summary) - 3;
+    if (remaining <= 0) break;
+    const question = truncateCharacters(
+      turn.question.replaceAll(/\s+/g, ' ').trim(),
+      Math.min(SUMMARY_QUESTION_CHARACTER_LIMIT, remaining),
+    );
+    summary += `\n- ${question}`;
+  }
+  return summary;
 }
 
 @Injectable()
@@ -218,18 +254,25 @@ export class ConversationService {
     });
   }
 
-  async historyForRun(user: AuthenticatedUser, conversationId: string): Promise<HistoryMessage[]> {
+  async contextForRun(user: AuthenticatedUser, conversationId: string): Promise<RunContext> {
     const detail = await this.getConversation(user, conversationId);
-    return detail.turns
-      .filter(
-        (turn): turn is VisibleTurn =>
-          turn.visibility === 'VISIBLE' && turn.status === 'COMPLETED' && Boolean(turn.answer),
-      )
-      .slice(-10)
-      .flatMap((turn) => [
+    const completedVisibleTurns = detail.turns.filter(
+      (turn): turn is VisibleTurn =>
+        turn.visibility === 'VISIBLE' && turn.status === 'COMPLETED' && Boolean(turn.answer),
+    );
+    const historyTurns = completedVisibleTurns.slice(-RECENT_HISTORY_TURN_LIMIT);
+    const summarizedTurns = completedVisibleTurns.slice(
+      0,
+      Math.max(0, completedVisibleTurns.length - RECENT_HISTORY_TURN_LIMIT),
+    );
+
+    return {
+      history: historyTurns.flatMap((turn) => [
         { role: 'user' as const, content: turn.question },
         { role: 'assistant' as const, content: turn.answer! },
-      ]);
+      ]),
+      historySummary: historySummary(summarizedTurns),
+    };
   }
 
   async getOwnedTurn(user: AuthenticatedUser, requestId: string) {

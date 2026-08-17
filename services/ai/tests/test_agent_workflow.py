@@ -136,6 +136,69 @@ async def test_follow_up_uses_contextualized_query_for_document_and_graph_retrie
 
 
 @pytest.mark.asyncio
+async def test_follow_up_includes_summary_in_document_and_graph_retrieval_queries() -> None:
+    space_id = uuid4()
+    source = _chunk(space_id, "采购部门负责审批。")
+    graph = _GraphTool([GraphEvidenceCandidate(uuid4(), "采购部门", "负责", "审批", 0.9, source)])
+    retrieval = _Retrieval([source])
+    agent = Agent(retrieval, _Chat(), graph_query=graph)  # type: ignore[arg-type]
+    inputs = _inputs(space_id)
+    inputs["policies"] = [SpacePolicy(space_id, True, False, True)]
+    inputs["history"] = [ChatMessage(role="user", content="最新用户问题")]
+    summary = "此前已授权的用户话题：\n- 窗口外主题"
+
+    events = [
+        event
+        async for event in agent.run(
+            query="它是谁负责的？",
+            history_summary=summary,
+            cancelled=asyncio.Event(),
+            **inputs,
+        )
+    ]
+
+    effective_query = f"{summary}\n最新用户问题\n追问：它是谁负责的？"
+    assert retrieval.queries == [effective_query]
+    assert graph.queries == [effective_query]
+    summary_event = next(event.summary for event in events if event.type == "retrieval.summary")
+    assert summary_event["query"] == effective_query
+    assert summary_event["contextualized"] is True
+
+
+@pytest.mark.asyncio
+async def test_answer_model_receives_only_evidence_prompt() -> None:
+    space_id = uuid4()
+    evidence = "evidence-only source passage"
+    retrieval = _Retrieval([_chunk(space_id, evidence)])
+    chat = _Chat()
+    agent = Agent(retrieval, chat)
+    inputs = _inputs(space_id)
+    inputs["policies"] = [SpacePolicy(space_id, True, False, True)]
+    inputs["history"] = [
+        ChatMessage(role="user", content="history user secret"),
+        ChatMessage(role="assistant", content="history assistant secret"),
+    ]
+    summary = "此前已授权的用户话题：\n- history summary secret"
+
+    _ = [
+        event
+        async for event in agent.run(
+            query="independent question",
+            history_summary=summary,
+            cancelled=asyncio.Event(),
+            **inputs,
+        )
+    ]
+
+    assert len(chat.messages[-1]) == 1
+    prompt = chat.messages[-1][0].content
+    assert evidence in prompt
+    assert "history user secret" not in prompt
+    assert "history assistant secret" not in prompt
+    assert "history summary secret" not in prompt
+
+
+@pytest.mark.asyncio
 async def test_orphan_follow_up_without_history_clarifies_without_retrieval() -> None:
     space_id = uuid4()
     retrieval = _Retrieval([])

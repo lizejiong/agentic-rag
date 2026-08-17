@@ -3,6 +3,7 @@ import json
 from uuid import UUID
 
 import pytest
+from pydantic import ValidationError
 from starlette.testclient import TestClient
 
 from rag_ai.contracts.agent_events import ChatRequest
@@ -34,9 +35,11 @@ def _minimal_payload() -> dict:
 
 class FakeAgent:
     last_history = None
+    last_history_summary = None
 
     async def run(self, **kwargs):  # noqa: ANN003,ARG002
         self.last_history = kwargs["history"]
+        self.last_history_summary = kwargs["history_summary"]
         request_id = UUID(REQUEST_ID)
         cancelled = asyncio.Event()
         async for event in fake_agent_events(
@@ -87,6 +90,29 @@ def test_run_uses_only_history_received_from_api() -> None:
         ("user", "persisted question"),
         ("assistant", "persisted answer"),
     ]
+
+
+def test_run_accepts_history_summary_from_api() -> None:
+    agent = FakeAgent()
+    runs_module._agent = agent
+    payload = _minimal_payload()
+    payload["historySummary"] = "此前已授权的用户话题：\\n- earlier question"
+    client = TestClient(app)
+
+    response = client.post("/v1/agent/runs", json=payload)
+
+    assert response.status_code == 200
+    assert ChatRequest.model_validate(payload).historySummary == payload["historySummary"]
+    assert agent.last_history_summary == payload["historySummary"]
+
+
+def test_history_summary_uses_a_unicode_code_point_limit() -> None:
+    payload = _minimal_payload()
+    payload["historySummary"] = "😀" * 4000
+
+    assert ChatRequest.model_validate(payload).historySummary == payload["historySummary"]
+    with pytest.raises(ValidationError):
+        ChatRequest.model_validate({**payload, "historySummary": "😀" * 4001})
 
 
 def test_cancel_is_idempotent() -> None:

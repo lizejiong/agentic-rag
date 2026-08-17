@@ -116,6 +116,7 @@ async def run_agent(request: ChatRequest) -> StreamingResponse:
                 acl=acl,
                 policies=policies,
                 history=history,
+                history_summary=request.historySummary,
                 cancelled=cancellation_event,
             ):
                 yield encode_ndjson(event)

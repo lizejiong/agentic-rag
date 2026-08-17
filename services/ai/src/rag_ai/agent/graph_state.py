@@ -22,6 +22,7 @@ class AgentGraphState(TypedDict, total=False):
     acl: AclSnapshot
     policies: list[SpacePolicy]
     history: list[ChatMessage]
+    history_summary: str
     profile: QuestionProfile
     rewrite_count: int
     retrieval_attempt: int
