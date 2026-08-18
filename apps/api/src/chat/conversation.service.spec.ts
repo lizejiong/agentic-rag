@@ -12,6 +12,8 @@ const REQUEST_ID = '00000000-0000-4000-8000-000000000011';
 const SPACE_ID = '00000000-0000-4000-8000-000000000012';
 const DOCUMENT_ID = '00000000-0000-4000-8000-000000000013';
 
+type DocumentAuthorizationInput = { documentId: string };
+
 const owner: AuthenticatedUser = {
   id: OWNER_ID,
   username: 'owner',
@@ -177,7 +179,7 @@ describe('ConversationService', () => {
     );
   });
 
-  it('uses only the ten most recent visible completed turns as agent history', async () => {
+  it('uses the six most recent visible completed turns as history and summarizes older questions', async () => {
     const { prisma, service } = createDependencies();
     prisma.chatTurn.findMany.mockResolvedValue(
       Array.from({ length: 12 }, (_, index) =>
@@ -191,10 +193,83 @@ describe('ConversationService', () => {
       ),
     );
 
-    const history = await service.historyForRun(owner, CONVERSATION_ID);
+    const context = await service.contextForRun(owner, CONVERSATION_ID);
 
-    expect(history).toHaveLength(20);
-    expect(history[0]).toEqual({ role: 'user', content: '问题 2' });
-    expect(history.at(-1)).toEqual({ role: 'assistant', content: '答案 11' });
+    expect(context.history).toHaveLength(12);
+    expect(context.history[0]).toEqual({ role: 'user', content: '问题 6' });
+    expect(context.history.at(-1)).toEqual({ role: 'assistant', content: '答案 11' });
+    expect(context.historySummary).toBe(
+      '此前已授权的用户话题：\n- 问题 0\n- 问题 1\n- 问题 2\n- 问题 3\n- 问题 4\n- 问题 5',
+    );
+    expect(context.historySummary).not.toContain('答案');
+  });
+
+  it('caps the summarized question count and character budgets while retaining recent turns', async () => {
+    const { prisma, service } = createDependencies();
+    prisma.chatTurn.findMany.mockResolvedValue(
+      Array.from({ length: 30 }, (_, index) =>
+        turnRecord({
+          id: `00000000-0000-4000-8000-${String(index + 200).padStart(12, '0')}`,
+          requestId: `00000000-0000-4000-8002-${String(index + 200).padStart(12, '0')}`,
+          question: `  问题 ${index}\t${'x'.repeat(index === 4 ? 300 : 100)}  `,
+          answer: `答案 ${index}`,
+          citations: [],
+        }),
+      ),
+    );
+
+    const context = await service.contextForRun(owner, CONVERSATION_ID);
+
+    expect(context.history).toHaveLength(12);
+    expect(context.history[0]).toEqual({
+      role: 'user',
+      content: `  问题 24\t${'x'.repeat(100)}  `,
+    });
+    expect(context.history.at(-1)).toEqual({ role: 'assistant', content: '答案 29' });
+    expect(context.historySummary).toMatch(/^此前已授权的用户话题：\n- /);
+    expect(context.historySummary).not.toContain('问题 3 ');
+    expect(context.historySummary).toContain('问题 4 ');
+    expect(context.historySummary).toContain('问题 23 ');
+    expect(context.historySummary.split('\n').filter((line) => line.startsWith('- '))).toHaveLength(
+      20,
+    );
+    expect(context.historySummary.split('\n').every((line) => line.length <= 242)).toBe(true);
+    expect(context.historySummary.length).toBeLessThanOrEqual(4000);
+  });
+
+  it('excludes currently redacted turns from both run context forms', async () => {
+    const { authorization, prisma, service } = createDependencies();
+    const revokedSpaceId = '00000000-0000-4000-8000-000000000016';
+    const revokedDocumentId = '00000000-0000-4000-8000-000000000017';
+    prisma.chatTurn.findMany.mockResolvedValue(
+      Array.from({ length: 12 }, (_, index) =>
+        turnRecord({
+          id: `00000000-0000-4000-8000-${String(index + 300).padStart(12, '0')}`,
+          requestId: `00000000-0000-4000-8003-${String(index + 300).padStart(12, '0')}`,
+          question: `问题 ${index}`,
+          answer: `答案 ${index}`,
+          scopeSpaceIds: index === 4 ? [revokedSpaceId] : [SPACE_ID],
+          citations: index === 8 ? [{ ...citation, documentId: revokedDocumentId }] : [],
+        }),
+      ),
+    );
+    authorization.requireSpace.mockImplementation((_user, spaceId) =>
+      spaceId === revokedSpaceId
+        ? Promise.reject(new ForbiddenException('SPACE_PERMISSION_DENIED'))
+        : Promise.resolve('VIEW'),
+    );
+    authorization.authorizeDocument.mockImplementation(
+      (_user, input: DocumentAuthorizationInput) =>
+        input.documentId === revokedDocumentId
+          ? Promise.reject(new NotFoundException('DOCUMENT_NOT_FOUND'))
+          : Promise.resolve({}),
+    );
+
+    const context = await service.contextForRun(owner, CONVERSATION_ID);
+    const detail = await service.getConversation(owner, CONVERSATION_ID);
+
+    expect(context.history.map((message) => message.content)).not.toContain('问题 8');
+    expect(context.historySummary).not.toContain('问题 4');
+    expect(detail.turns.filter((turn) => turn.visibility === 'REDACTED')).toHaveLength(2);
   });
 });

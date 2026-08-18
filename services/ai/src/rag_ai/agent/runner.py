@@ -89,9 +89,18 @@ class Agent:
         policies: list[SpacePolicy],
         history: list[ChatMessage],
         cancelled: asyncio.Event,
+        history_summary: str = "",
     ) -> AsyncIterator[AgentEvent]:
         state = _initial_state(
-            request_id, trace_id, actor_id, query, selected_space_ids, acl, policies, history
+            request_id,
+            trace_id,
+            actor_id,
+            query,
+            selected_space_ids,
+            acl,
+            policies,
+            history,
+            history_summary,
         )
         seq = 0
         yield RunStarted(
@@ -137,9 +146,18 @@ class Agent:
         acl: AclSnapshot,
         policies: list[SpacePolicy],
         history: list[ChatMessage] | None = None,
+        history_summary: str = "",
     ) -> AgentResult:
         state = await self._workflow.ainvoke(_initial_state(
-            request_id, trace_id, actor_id, query, selected_space_ids, acl, policies, history or []
+            request_id,
+            trace_id,
+            actor_id,
+            query,
+            selected_space_ids,
+            acl,
+            policies,
+            history or [],
+            history_summary,
         ))
         citations = [
             _citation_from_chunk(chunk, request_id=request_id, trace_id=trace_id, seq=index)
@@ -160,6 +178,7 @@ def _initial_state(
     request_id: UUID, trace_id: str, actor_id: str, query: str,
     selected_space_ids: list[UUID], acl: AclSnapshot, policies: list[SpacePolicy],
     history: list[ChatMessage],
+    history_summary: str = "",
 ) -> AgentGraphState:
     return {
         "request_id": request_id,
@@ -172,6 +191,7 @@ def _initial_state(
         "acl": acl,
         "policies": policies,
         "history": history,
+        "history_summary": history_summary,
         "rewrite_count": 0,
         "retrieval_attempt": 0,
         "ranked_chunks": [],

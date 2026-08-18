@@ -114,10 +114,6 @@ class WorkerSettings(DatabaseSettings):
     llm_api_key: str = Field(default="", min_length=0)
     llm_base_url: str = Field(default="", min_length=0)
 
-    # Short-term memory.
-    memory_window_turns: int = Field(default=10, ge=0, le=100)
-    memory_ttl_seconds: int = Field(default=86_400, ge=60, le=7_776_000)
-
     neo4j_uri: str = Field(default="bolt://127.0.0.1:7687", min_length=1)
     neo4j_user: str = Field(default="neo4j", min_length=1)
     neo4j_password: str = Field(default="", min_length=0)

@@ -135,7 +135,7 @@ describe('Chat cancellation boundaries', () => {
       .overrideProvider(ConversationService)
       .useValue({
         startTurn: jest.fn().mockResolvedValue({ id: TURN_ID }),
-        historyForRun: jest.fn().mockResolvedValue([]),
+        contextForRun: jest.fn().mockResolvedValue({ history: [], historySummary: '' }),
         completeTurn: jest.fn().mockResolvedValue({ id: TURN_ID }),
         failTurn: jest.fn().mockResolvedValue(undefined),
         getOwnedTurn: jest.fn().mockResolvedValue({ id: TURN_ID }),
