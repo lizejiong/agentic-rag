@@ -73,7 +73,7 @@ describe('ChatController', () => {
   let requireSpace: jest.Mock;
   let conversations: {
     startTurn: jest.Mock;
-    historyForRun: jest.Mock;
+    contextForRun: jest.Mock;
     completeTurn: jest.Mock;
     failTurn: jest.Mock;
     getOwnedTurn: jest.Mock;
@@ -84,10 +84,13 @@ describe('ChatController', () => {
     requireSpace = jest.fn().mockResolvedValue('VIEW');
     conversations = {
       startTurn: jest.fn().mockResolvedValue({ id: TURN_ID }),
-      historyForRun: jest.fn().mockResolvedValue([
-        { role: 'user', content: 'trusted question' },
-        { role: 'assistant', content: 'trusted answer' },
-      ]),
+      contextForRun: jest.fn().mockResolvedValue({
+        history: [
+          { role: 'user', content: 'trusted question' },
+          { role: 'assistant', content: 'trusted answer' },
+        ],
+        historySummary: '此前已授权的用户话题：\n- trusted earlier question',
+      }),
       completeTurn: jest.fn().mockResolvedValue({ id: TURN_ID }),
       failTurn: jest.fn().mockResolvedValue(undefined),
       getOwnedTurn: jest.fn().mockResolvedValue({ id: TURN_ID }),
@@ -147,7 +150,12 @@ describe('ChatController', () => {
           { role: 'user', content: 'trusted question' },
           { role: 'assistant', content: 'trusted answer' },
         ],
+        historySummary: '此前已授权的用户话题：\n- trusted earlier question',
       }),
+    );
+    expect(conversations.contextForRun).toHaveBeenCalledWith(
+      expect.objectContaining({ id: USER_ID }),
+      CONVERSATION_ID,
     );
     expect(conversations.startTurn).toHaveBeenCalledWith(
       expect.objectContaining({

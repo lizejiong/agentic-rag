@@ -18,10 +18,10 @@ Atlas RAG 是一个面向企业知识场景的 Agentic RAG 项目。目标能力
 - 不可变审计、事务 PostgreSQL Outbox、Redis Streams 幂等消费、退避与死信
 - React 内存 access token、HttpOnly cookie 会话恢复和知识空间选择
 - 多格式文件与 URL 导入、ClamAV 扫描、Docling 解析、版本管理、删除/重试/替换和文档管理界面
-- pgvector + Elasticsearch 混合检索、RRF、Reranker、引用、检索摘要和 Redis 会话记忆
+- pgvector + Elasticsearch 混合检索、RRF、Reranker、引用、检索摘要，以及基于 PostgreSQL 聊天轮次的持久会话动态上下文
 - OpenAI 兼容的 Embedding/Chat 模型适配与真实模型连接检查
 
-Neo4j 图谱治理现已提供候选抽取、证据审核发布、关系浏览、路径查询和聊天只读证据补充；LangGraph 主问答流程已支持基于 Redis 会话短期历史的上下文追问检索。长期记忆、语音和可观测性仍在后续阶段，详见
+Neo4j 图谱治理现已提供候选抽取、证据审核发布、关系浏览、路径查询和聊天只读证据补充；LangGraph 主问答流程已支持持久会话的动态上下文：PostgreSQL 聊天轮次是唯一事实来源，每次请求均按最新 ACL 重新过滤，并用最近 6 个可见的已完成问答原文与更早可见轮次的用户问题动态摘要改写短追问的检索查询。历史与摘要不作为回答证据，权限或文档撤销后旧轮不会复用；Redis 仍用于任务流和基础设施，不再用于会话记忆。此为最小会话级长期上下文，不包括 Mem0、跨会话或跨用户画像、记忆管理 UI、Langfuse、Studio 或 Deep Agents；这些以及语音、可观测性仍在后续阶段，详见
 [总路线图](docs/superpowers/plans/2026-07-18-enterprise-rag-master-roadmap.md)。
 
 ## 工作区

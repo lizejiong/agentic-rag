@@ -121,3 +121,4 @@ class ChatHistoryMessage(StrictModel):
 
 class ChatRequest(RunRequest):
     history: list[ChatHistoryMessage] = Field(default_factory=list)
+    historySummary: str = Field(default="", max_length=4000)

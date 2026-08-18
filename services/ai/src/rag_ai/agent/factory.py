@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from rag_ai.agent.runner import Agent
 from rag_ai.graph.factory import build_graph_service
 from rag_ai.graph.query_tool import GraphQueryTool
-from rag_ai.memory.session_memory import RedisSessionMemoryStore
 from rag_ai.models.base import ChatModel, EmbeddingModel, Reranker
 from rag_ai.models.factory import create_chat_model, create_embedding_model, create_reranker
 from rag_ai.retrieval.evidence_selector import EvidenceSelector
@@ -62,14 +60,6 @@ def build_retrieval_service(
             rrf_top_k=settings.retrieval_rrf_top_k,
             rerank_top_k=settings.retrieval_rerank_top_k,
         ),
-    )
-
-
-def build_memory_store(settings: WorkerSettings) -> RedisSessionMemoryStore:
-    return RedisSessionMemoryStore(
-        Redis.from_url(str(settings.redis_url)),
-        window_turns=settings.memory_window_turns,
-        ttl_seconds=settings.memory_ttl_seconds,
     )
 
 
